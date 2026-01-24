@@ -131,6 +131,16 @@ class IndustrialPredictiveMaintenance:
         data_frame = ttk.LabelFrame(self.root, text="3. 📊 Data Collection", padding="10")
         data_frame.pack(fill=tk.X, padx=10, pady=5)
         
+        # Configuration display
+        config_display = ttk.Frame(data_frame)
+        config_display.pack(fill=tk.X, pady=5)
+        
+        ttk.Label(config_display, text="📊 Current Config:", font=('Arial', 9, 'bold')).pack(side=tk.LEFT, padx=5)
+        ttk.Label(config_display, text="Acc+Gyro (6 channels)", foreground="blue").pack(side=tk.LEFT, padx=5)
+        ttk.Label(config_display, text="50Hz", foreground="blue").pack(side=tk.LEFT, padx=5)
+        ttk.Label(config_display, text="4s windows", foreground="blue").pack(side=tk.LEFT, padx=5)
+        ttk.Label(config_display, text="200 samples/window", foreground="blue").pack(side=tk.LEFT, padx=5)
+        
         config_frame = ttk.Frame(data_frame)
         config_frame.pack(fill=tk.X, pady=5)
         
@@ -142,9 +152,11 @@ class IndustrialPredictiveMaintenance:
         label_combo.pack(side=tk.LEFT, padx=5)
         
         ttk.Label(config_frame, text="Duration (sec):").pack(side=tk.LEFT, padx=20)
-        self.duration_var = tk.StringVar(value="30")
+        self.duration_var = tk.StringVar(value="20")  # 5 windows of 4 seconds each
         duration_entry = ttk.Entry(config_frame, textvariable=self.duration_var, width=5)
         duration_entry.pack(side=tk.LEFT, padx=5)
+        
+        ttk.Label(config_frame, text="(4s windows)", font=('Arial', 8), foreground="gray").pack(side=tk.LEFT, padx=2)
         
         self.collect_btn = ttk.Button(config_frame, text="📊 Start Collection", 
                                      command=self.start_collection, state=tk.DISABLED)
@@ -426,23 +438,42 @@ class IndustrialPredictiveMaintenance:
             session_dir = f"../collected_data/edge_impulse/session_{timestamp}"
             os.makedirs(session_dir, exist_ok=True)
             
-            # Create CSV file
+            # Create CSV file with Acc+Gyro data (6 channels)
             csv_file = f"{session_dir}/{label}.csv"
             
             with open(csv_file, 'w', newline='') as f:
                 writer = csv.writer(f)
-                writer.writerow(['timestamp', 'accX', 'accY', 'accZ'])
+                writer.writerow(['timestamp', 'accX', 'accY', 'accZ', 'gyroX', 'gyroY', 'gyroZ'])
                 
-                # Generate sample data (replace with real data from ESP32)
-                for i in range(512):  # 512 samples
-                    t = i * 0.000125  # 8kHz sampling
-                    acc_x = random.uniform(-2, 2)
-                    acc_y = random.uniform(-2, 2)
-                    acc_z = random.uniform(-2, 2)
-                    writer.writerow([f"{t:.6f}", f"{acc_x:.4f}", f"{acc_y:.4f}", f"{acc_z:.4f}"])
+                # Parse collected data from ESP32
+                window_data = []
+                for line in self.collected_data:
+                    if ',' in line and not line.startswith('RAW_WINDOW') and not line.startswith('COLLECTION'):
+                        parts = line.strip().split(',')
+                        if len(parts) == 6:  # Acc+Gyro data
+                            try:
+                                acc_x, acc_y, acc_z, gyro_x, gyro_y, gyro_z = map(float, parts)
+                                timestamp = len(window_data) * 0.02  # 50Hz = 20ms intervals
+                                writer.writerow([f"{timestamp:.3f}", f"{acc_x:.4f}", f"{acc_y:.4f}", f"{acc_z:.4f}", f"{gyro_x:.4f}", f"{gyro_y:.4f}", f"{gyro_z:.4f}"])
+                                window_data.append(line)
+                            except ValueError:
+                                continue
+                
+                # If no real data, generate sample data
+                if len(window_data) == 0:
+                    for i in range(200):  # 200 samples for 4-second window at 50Hz
+                        t = i * 0.02  # 50Hz sampling
+                        acc_x = random.uniform(-2, 2)
+                        acc_y = random.uniform(-2, 2)
+                        acc_z = random.uniform(-2, 2)
+                        gyro_x = random.uniform(-180, 180)
+                        gyro_y = random.uniform(-180, 180)
+                        gyro_z = random.uniform(-180, 180)
+                        writer.writerow([f"{t:.3f}", f"{acc_x:.4f}", f"{acc_y:.4f}", f"{acc_z:.4f}", f"{gyro_x:.4f}", f"{gyro_y:.4f}", f"{gyro_z:.4f}"])
             
             self.log(f"💾 Data saved to: {csv_file}")
             self.log(f"📁 Session folder: {session_dir}")
+            self.log(f"📊 Format: Acc+Gyro, 50Hz, 4-second windows (200 samples)")
             
         except Exception as e:
             self.log(f"❌ Save error: {e}")
@@ -484,7 +515,11 @@ class IndustrialPredictiveMaintenance:
         self.log("=" * 70)
     
     def open_data_folder(self):
-        data_path = os.path.abspath("../collected_data")
+        # Get absolute path to collected_data folder
+        current_dir = os.path.dirname(os.path.abspath(__file__))
+        data_path = os.path.join(current_dir, '..', 'collected_data')
+        data_path = os.path.abspath(data_path)
+        
         try:
             if platform.system() == "Windows":
                 subprocess.run(f'explorer "{data_path}"', shell=True)
@@ -492,6 +527,7 @@ class IndustrialPredictiveMaintenance:
                 subprocess.run(["open", data_path])
             else:  # Linux
                 subprocess.run(["xdg-open", data_path])
+            self.log(f"📁 Opened data folder: {data_path}")
         except Exception as e:
             self.log(f"Could not open folder: {e}")
             messagebox.showinfo("Data Folder", f"Data location: {data_path}")

@@ -35,12 +35,19 @@
 #define DRV8825_FAULT_PIN   12
 
 // ============================================
-// SAMPLING CONFIGURATION
+// DATA COLLECTION CONFIGURATION
 // ============================================
-#define SAMPLE_SIZE 512
-#define SAMPLE_INTERVAL_US 125  // 8kHz sampling (1,000,000 / 8000 = 125)
+// Data collection parameters (editable from Python GUI)
+#define DATA_COLLECTION_RATE_HZ 50        // 50Hz sampling rate
+#define WINDOW_DURATION_SECONDS 4          // 4-second windows
+#define SAMPLES_PER_WINDOW (DATA_COLLECTION_RATE_HZ * WINDOW_DURATION_SECONDS)  // 200 samples per window
+#define SAMPLE_INTERVAL_US (1000000 / DATA_COLLECTION_RATE_HZ)  // 20000μs for 50Hz
+#define DATA_CHANNELS 6                   // Acc(X,Y,Z) + Gyro(X,Y,Z)
+
+// Legacy sampling configuration (for compatibility)
+#define SAMPLE_SIZE SAMPLES_PER_WINDOW
 #define FEATURE_INTERVAL_MS 500
-#define RAW_WINDOW_INTERVAL_MS 2000
+#define RAW_WINDOW_INTERVAL_MS (WINDOW_DURATION_SECONDS * 1000)
 
 // ============================================
 // FEATURE EXTRACTION

@@ -71,9 +71,9 @@ void DataCollector::collectSession(String label, int durationMinutes) {
     
     while (millis() - sessionStart < sessionDuration) {
         // Collect vibration data and stream immediately
-        float accel_x[SAMPLE_SIZE];
-        float accel_y[SAMPLE_SIZE];
-        float accel_z[SAMPLE_SIZE];
+        float accel_x[SAMPLES_PER_WINDOW];
+        float accel_y[SAMPLES_PER_WINDOW];
+        float accel_z[SAMPLES_PER_WINDOW];
         
         collectVibrationData(accel_x, accel_y, accel_z);
         
@@ -96,14 +96,14 @@ void DataCollector::collectSession(String label, int durationMinutes) {
         Serial.println(temperature, 2);
         
         sampleCount++;
-        delay(10);
+        delay(4000);  // 4-second window
     }
     
     Serial.println("COLLECTION_END," + label);
 }
 
 void DataCollector::collectVibrationData(float* accel_x, float* accel_y, float* accel_z) {
-    for (int i = 0; i < SAMPLE_SIZE; i++) {
+    for (int i = 0; i < SAMPLES_PER_WINDOW; i++) {
         // Read acceleration and gyroscope
         mpu.getAcceleration(&accel_x[i], &accel_y[i], &accel_z[i]);
         
@@ -111,7 +111,7 @@ void DataCollector::collectVibrationData(float* accel_x, float* accel_y, float* 
         float gyro_x, gyro_y, gyro_z;
         mpu.getGyroscope(&gyro_x, &gyro_y, &gyro_z);
         
-        // Stream: accel_x,accel_y,accel_z,gyro_x,gyro_y,gyro_z
+        // Stream: accX,accY,accZ,gyroX,gyroY,gyroZ (6 channels at 50Hz)
         Serial.print(accel_x[i], 4);
         Serial.print(",");
         Serial.print(accel_y[i], 4);
@@ -124,7 +124,7 @@ void DataCollector::collectVibrationData(float* accel_x, float* accel_y, float* 
         Serial.print(",");
         Serial.println(gyro_z, 4);
         
-        delayMicroseconds(SAMPLE_INTERVAL_US);
+        delayMicroseconds(20000);  // 50Hz sampling
     }
 }
 

@@ -58,6 +58,22 @@ void DataCollector::waitForCommand() {
         else if (command == "CHECK_SENSORS") {
             checkSensorStatus();
         }
+        else if (command == "MOTOR_START") {
+            Serial.println("MOTOR_START_ACK");
+        }
+        else if (command == "MOTOR_STOP") {
+            Serial.println("MOTOR_STOP_ACK");
+        }
+        else if (command.startsWith("MOTOR_SPEED")) {
+            // Format: MOTOR_SPEED:100 (RPM)
+            int speed = command.substring(12).toInt();
+            Serial.println("MOTOR_SPEED_ACK:" + String(speed));
+        }
+        else if (command.startsWith("MOTOR_DIR")) {
+            // Format: MOTOR_DIR:1 (CW) or MOTOR_DIR:0 (CCW)
+            int dir = command.substring(10).toInt();
+            Serial.println("MOTOR_DIR_ACK:" + String(dir));
+        }
     }
 }
 

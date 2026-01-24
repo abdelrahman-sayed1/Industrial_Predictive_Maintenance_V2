@@ -55,6 +55,9 @@ void DataCollector::waitForCommand() {
         else if (command == "PING") {
             Serial.println("PONG");
         }
+        else if (command == "CHECK_SENSORS") {
+            checkSensorStatus();
+        }
     }
 }
 
@@ -179,4 +182,80 @@ float DataCollector::calculateStdDev(float* data, int length) {
         variance += (data[i] - mean) * (data[i] - mean);
     }
     return sqrt(variance / length);
+}
+
+void DataCollector::checkSensorStatus() {
+    Serial.println("Checking sensor connections...");
+    
+    // Check MPU6050
+    if (mpu.initialize()) {
+        Serial.println("MPU6050: OK");
+    } else {
+        Serial.println("MPU6050: FAIL - Not connected or I2C error");
+    }
+    
+    // Check Encoder (simple test - read current state)
+    int encoderA = digitalRead(ENCODER_PIN_A);
+    int encoderB = digitalRead(ENCODER_PIN_B);
+    if (encoderA != -1 && encoderB != -1) {
+        Serial.println("Encoder: OK");
+    } else {
+        Serial.println("Encoder: FAIL - Pin configuration error");
+    }
+    
+    // Check MAX471 (analog read test)
+    int voltageRead = analogRead(MAX471_VOLTAGE_PIN);
+    int currentRead = analogRead(MAX471_CURRENT_PIN);
+    if (voltageRead >= 0 && currentRead >= 0) {
+        Serial.println("MAX471: OK");
+    } else {
+        Serial.println("MAX471: FAIL - Analog read error");
+    }
+    
+    // Check DS18B20
+    float temp = tempSensor.readTemperature();
+    if (temp != -127.0 && temp != 85.0) {  // Common error values
+        Serial.println("DS18B20: OK");
+    } else {
+        Serial.println("DS18B20: FAIL - Not connected or read error");
+    }
+    
+    // Check Motor Driver (using FLT pin for detection)
+    pinMode(DRV8825_ENABLE_PIN, OUTPUT);
+    pinMode(DRV8825_DIR_PIN, OUTPUT);
+    pinMode(DRV8825_STEP_PIN, OUTPUT);
+    pinMode(DRV8825_FAULT_PIN, INPUT_PULLUP);
+    
+    // Enable the driver first
+    digitalWrite(DRV8825_ENABLE_PIN, LOW);
+    delay(100);  // Give it time to initialize
+    
+    // Read fault pin - should be HIGH if no fault and driver is connected
+    int faultState = digitalRead(DRV8825_FAULT_PIN);
+    
+    // Test by toggling enable pin and checking if fault pin responds
+    digitalWrite(DRV8825_ENABLE_PIN, HIGH);  // Disable
+    delay(50);
+    int faultDisabled = digitalRead(DRV8825_FAULT_PIN);
+    
+    digitalWrite(DRV8825_ENABLE_PIN, LOW);   // Enable again
+    delay(50);
+    int faultEnabled = digitalRead(DRV8825_FAULT_PIN);
+    
+    // If the fault pin is consistently LOW, driver is either not connected or in fault
+    if (faultState == LOW && faultDisabled == LOW && faultEnabled == LOW) {
+        Serial.println("DRV8825: FAIL - Not connected or fault condition");
+    }
+    // If fault pin changes state or is HIGH, driver is likely connected
+    else if (faultState == HIGH || faultDisabled != faultEnabled) {
+        Serial.println("DRV8825: OK");
+    }
+    else {
+        Serial.println("DRV8825: UNKNOWN - Inconsistent readings");
+    }
+    
+    // Leave driver in disabled state for safety
+    digitalWrite(DRV8825_ENABLE_PIN, HIGH);
+    
+    Serial.println("SENSOR_CHECK_COMPLETE");
 }

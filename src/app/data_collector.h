@@ -19,6 +19,7 @@ private:
     void collectSession(String label, int durationMinutes);
     void collectVibrationData(float* accel_x, float* accel_y, float* accel_z);
     SampleFeatures extractFeatures(float* accel_x, float* accel_y, float* accel_z);
+    void checkSensorStatus();
     
     // Feature calculation methods
     float calculateRMS(float* data, int length);

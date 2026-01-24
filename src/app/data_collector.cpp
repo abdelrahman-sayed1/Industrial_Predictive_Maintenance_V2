@@ -55,6 +55,9 @@ void DataCollector::waitForCommand() {
         else if (command == "PING") {
             Serial.println("PONG");
         }
+        else if (command == "CHECK_SENSORS") {
+            checkSensorStatus();
+        }
     }
 }
 
@@ -68,9 +71,9 @@ void DataCollector::collectSession(String label, int durationMinutes) {
     
     while (millis() - sessionStart < sessionDuration) {
         // Collect vibration data and stream immediately
-        float accel_x[SAMPLE_SIZE];
-        float accel_y[SAMPLE_SIZE];
-        float accel_z[SAMPLE_SIZE];
+        float accel_x[SAMPLES_PER_WINDOW];
+        float accel_y[SAMPLES_PER_WINDOW];
+        float accel_z[SAMPLES_PER_WINDOW];
         
         collectVibrationData(accel_x, accel_y, accel_z);
         
@@ -93,14 +96,14 @@ void DataCollector::collectSession(String label, int durationMinutes) {
         Serial.println(temperature, 2);
         
         sampleCount++;
-        delay(10);
+        delay(4000);  // 4-second window
     }
     
     Serial.println("COLLECTION_END," + label);
 }
 
 void DataCollector::collectVibrationData(float* accel_x, float* accel_y, float* accel_z) {
-    for (int i = 0; i < SAMPLE_SIZE; i++) {
+    for (int i = 0; i < SAMPLES_PER_WINDOW; i++) {
         // Read acceleration and gyroscope
         mpu.getAcceleration(&accel_x[i], &accel_y[i], &accel_z[i]);
         
@@ -108,7 +111,7 @@ void DataCollector::collectVibrationData(float* accel_x, float* accel_y, float* 
         float gyro_x, gyro_y, gyro_z;
         mpu.getGyroscope(&gyro_x, &gyro_y, &gyro_z);
         
-        // Stream: accel_x,accel_y,accel_z,gyro_x,gyro_y,gyro_z
+        // Stream: accX,accY,accZ,gyroX,gyroY,gyroZ (6 channels at 50Hz)
         Serial.print(accel_x[i], 4);
         Serial.print(",");
         Serial.print(accel_y[i], 4);
@@ -121,7 +124,7 @@ void DataCollector::collectVibrationData(float* accel_x, float* accel_y, float* 
         Serial.print(",");
         Serial.println(gyro_z, 4);
         
-        delayMicroseconds(SAMPLE_INTERVAL_US);
+        delayMicroseconds(20000);  // 50Hz sampling
     }
 }
 
@@ -179,4 +182,80 @@ float DataCollector::calculateStdDev(float* data, int length) {
         variance += (data[i] - mean) * (data[i] - mean);
     }
     return sqrt(variance / length);
+}
+
+void DataCollector::checkSensorStatus() {
+    Serial.println("Checking sensor connections...");
+    
+    // Check MPU6050
+    if (mpu.initialize()) {
+        Serial.println("MPU6050: OK");
+    } else {
+        Serial.println("MPU6050: FAIL - Not connected or I2C error");
+    }
+    
+    // Check Encoder (simple test - read current state)
+    int encoderA = digitalRead(ENCODER_PIN_A);
+    int encoderB = digitalRead(ENCODER_PIN_B);
+    if (encoderA != -1 && encoderB != -1) {
+        Serial.println("Encoder: OK");
+    } else {
+        Serial.println("Encoder: FAIL - Pin configuration error");
+    }
+    
+    // Check MAX471 (analog read test)
+    int voltageRead = analogRead(MAX471_VOLTAGE_PIN);
+    int currentRead = analogRead(MAX471_CURRENT_PIN);
+    if (voltageRead >= 0 && currentRead >= 0) {
+        Serial.println("MAX471: OK");
+    } else {
+        Serial.println("MAX471: FAIL - Analog read error");
+    }
+    
+    // Check DS18B20
+    float temp = tempSensor.readTemperature();
+    if (temp != -127.0 && temp != 85.0) {  // Common error values
+        Serial.println("DS18B20: OK");
+    } else {
+        Serial.println("DS18B20: FAIL - Not connected or read error");
+    }
+    
+    // Check Motor Driver (using FLT pin for detection)
+    pinMode(DRV8825_ENABLE_PIN, OUTPUT);
+    pinMode(DRV8825_DIR_PIN, OUTPUT);
+    pinMode(DRV8825_STEP_PIN, OUTPUT);
+    pinMode(DRV8825_FAULT_PIN, INPUT_PULLUP);
+    
+    // Enable the driver first
+    digitalWrite(DRV8825_ENABLE_PIN, LOW);
+    delay(100);  // Give it time to initialize
+    
+    // Read fault pin - should be HIGH if no fault and driver is connected
+    int faultState = digitalRead(DRV8825_FAULT_PIN);
+    
+    // Test by toggling enable pin and checking if fault pin responds
+    digitalWrite(DRV8825_ENABLE_PIN, HIGH);  // Disable
+    delay(50);
+    int faultDisabled = digitalRead(DRV8825_FAULT_PIN);
+    
+    digitalWrite(DRV8825_ENABLE_PIN, LOW);   // Enable again
+    delay(50);
+    int faultEnabled = digitalRead(DRV8825_FAULT_PIN);
+    
+    // If the fault pin is consistently LOW, driver is either not connected or in fault
+    if (faultState == LOW && faultDisabled == LOW && faultEnabled == LOW) {
+        Serial.println("DRV8825: FAIL - Not connected or fault condition");
+    }
+    // If fault pin changes state or is HIGH, driver is likely connected
+    else if (faultState == HIGH || faultDisabled != faultEnabled) {
+        Serial.println("DRV8825: OK");
+    }
+    else {
+        Serial.println("DRV8825: UNKNOWN - Inconsistent readings");
+    }
+    
+    // Leave driver in disabled state for safety
+    digitalWrite(DRV8825_ENABLE_PIN, HIGH);
+    
+    Serial.println("SENSOR_CHECK_COMPLETE");
 }

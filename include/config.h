@@ -28,6 +28,12 @@
 #define I2C_SDA_PIN 19
 #define I2C_SCL_PIN 22
 
+// DRV8825 motor driver pins
+#define DRV8825_STEP_PIN    25
+#define DRV8825_DIR_PIN     26
+#define DRV8825_ENABLE_PIN  14
+#define DRV8825_FAULT_PIN   12
+
 // ============================================
 // SAMPLING CONFIGURATION
 // ============================================

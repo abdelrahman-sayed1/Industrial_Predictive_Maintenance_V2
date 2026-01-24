@@ -5,6 +5,7 @@
 #include "../lib/Encoder/Encoder.h"
 #include "../lib/MAX471/MAX471.h"
 #include "../lib/DS18B20/DS18B20.h"
+#include "../lib/DRV8825/DRV8825.h"
 #include "../include/config.h"
 
 // ============================================
@@ -14,6 +15,7 @@ MPU6050 mpu;
 Encoder encoder(ENCODER_PIN_A, ENCODER_PIN_B);
 MAX471 powerSensor(MAX471_VOLTAGE_PIN, MAX471_CURRENT_PIN);
 DS18B20 tempSensor(ONEWIRE_PIN);
+DRV8825 motorDriver(DRV8825_STEP_PIN, DRV8825_DIR_PIN, DRV8825_ENABLE_PIN, DRV8825_FAULT_PIN);
 
 // ============================================
 // APPLICATION COMPONENTS
@@ -51,6 +53,11 @@ void setup() {
         Serial.println("✗ ERROR: Data collector initialization failed");
         while(1) delay(1000);
     }
+    
+    // Initialize motor driver
+    motorDriver.begin();
+    motorDriver.enable();
+    Serial.println("✓ Motor driver initialized");
     
     Serial.println("✓ System ready for data collection\n");
 }

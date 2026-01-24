@@ -33,15 +33,18 @@ Connect sensors according to `docs/pinout.md`
 pio run --target upload
 ```
 
-### 3. Collect Training Data
+### 3. Collect Training Data (Edge Impulse – raw-only, EI-ready)
 ```bash
 cd python_scripts
 pip install -r requirements.txt
-python data_collector.py
+python edge_impulse_collector.py
 ```
+- Select COM port, then run 5 states: **normal**, **imbalance**, **misalignment**, **bearing_defect**, **looseness** (~5 min each).
+- Output: `collected_data/edge_impulse/<run_id>/*.csv` — one CSV per 512-sample window (`timestamp,accX,accY,accZ`, 0.125 ms step, 8 kHz). Filenames: `label.id.csv` (e.g. `normal.0.csv`).
 
-### 4. Train ML Model
-Upload `collected_data/*.csv` to Edge Impulse
+### 4. Train ML Model (Edge Impulse)
+- Upload the `collected_data/edge_impulse/<run_id>/` folder to Edge Impulse → **Data acquisition**.
+- Use DSP → **Choose recommended**, then train classifier and deploy to ESP32.
 
 ### 5. Deploy
 Export model and integrate into firmware

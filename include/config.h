@@ -34,6 +34,12 @@
 #define DRV8825_ENABLE_PIN  14
 #define DRV8825_FAULT_PIN   12
 
+// DRV8825 current limiting (IMPORTANT for preventing overheating!)
+#define DRV8825_CURRENT_LIMIT_MA  500    // Set to 500mA for safety (adjust based on motor)
+#define DRV8825_MODE0_PIN        13      // Microstep mode pins (optional)
+#define DRV8825_MODE1_PIN        15      // Microstep mode pins (optional)
+#define DRV8825_MODE2_PIN        2       // Microstep mode pins (optional)
+
 // ============================================
 // DATA COLLECTION CONFIGURATION
 // ============================================

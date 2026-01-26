@@ -21,7 +21,12 @@ class IndustrialPredictiveMaintenance:
     def __init__(self, root):
         self.root = root
         self.root.title("🏭 Industrial Predictive Maintenance - ALL IN ONE")
-        self.root.geometry("1000x800")
+        self.root.geometry("1400x800")
+        self.root.minsize(1200, 700)
+        
+        # Create main container with notebook (tabs)
+        self.notebook = ttk.Notebook(self.root)
+        self.notebook.pack(fill=tk.BOTH, expand=True, padx=5, pady=5)
         
         # System variables
         self.serial_connection = None
@@ -33,6 +38,10 @@ class IndustrialPredictiveMaintenance:
         self.create_main_interface()
         self.refresh_ports()
         
+        # Configure grid weights for proper resizing
+        self.root.grid_rowconfigure(0, weight=1)
+        self.root.grid_columnconfigure(0, weight=1)
+        
         # Auto-start with welcome message
         self.log("🎯 INDUSTRIAL PREDICTIVE MAINTENANCE SYSTEM - ALL IN ONE")
         self.log("=" * 70)
@@ -40,26 +49,56 @@ class IndustrialPredictiveMaintenance:
         self.log("  ✅ ESP32 Connection & Communication")
         self.log("  ✅ Real-time Sensor Status Checking")
         self.log("  ✅ Data Collection & Storage")
+        self.log("  ✅ Motor Control")
         self.log("  ✅ Automated Demo Mode")
         self.log("  ✅ CSV Export for ML Training")
         self.log("=" * 70)
         self.log("Ready to connect to your ESP32!")
     
     def create_main_interface(self):
+        # Create tabs
+        self.create_connection_tab()
+        self.create_sensors_tab()
+        self.create_data_collection_tab()
+        self.create_motor_control_tab()
+        self.create_log_tab()
+        
+        # Configure grid weights for proper resizing
+        self.root.grid_rowconfigure(0, weight=1)
+        self.root.grid_columnconfigure(0, weight=1)
+        
+        # Auto-start with welcome message
+        self.log("🎯 INDUSTRIAL PREDICTIVE MAINTENANCE SYSTEM - ALL IN ONE")
+        self.log("=" * 70)
+        self.log("Features:")
+        self.log("  ✅ ESP32 Connection & Communication")
+        self.log("  ✅ Real-time Sensor Status Checking")
+        self.log("  ✅ Data Collection & Storage")
+        self.log("  ✅ Motor Control")
+        self.log("  ✅ Automated Demo Mode")
+        self.log("  ✅ CSV Export for ML Training")
+        self.log("=" * 70)
+        self.log("Ready to connect to your ESP32!")
+    
+    def create_connection_tab(self):
+        # Connection Tab
+        conn_tab = ttk.Frame(self.notebook)
+        self.notebook.add(conn_tab, text="🔌 Connection")
+        
         # Title Frame
-        title_frame = ttk.Frame(self.root)
+        title_frame = ttk.Frame(conn_tab)
         title_frame.pack(fill=tk.X, padx=10, pady=5)
         
         title_label = ttk.Label(title_frame, text="🏭 INDUSTRIAL PREDICTIVE MAINTENANCE", 
                                 font=('Arial', 18, 'bold'))
         title_label.pack()
         
-        subtitle = ttk.Label(title_frame, text="Complete System: Connection → Sensor Check → Data Collection → ML Training", 
+        subtitle = ttk.Label(title_frame, text="Complete System: Connection → Sensor Check → Data Collection → Motor Control", 
                             font=('Arial', 10))
         subtitle.pack()
         
         # Mode Selection Frame
-        mode_frame = ttk.LabelFrame(self.root, text="🎛️ System Mode", padding="10")
+        mode_frame = ttk.LabelFrame(conn_tab, text="🎛️ System Mode", padding="10")
         mode_frame.pack(fill=tk.X, padx=10, pady=5)
         
         self.mode_var = tk.StringVar(value="manual")
@@ -73,7 +112,7 @@ class IndustrialPredictiveMaintenance:
                  font=('Arial', 10, 'bold')).pack(side=tk.LEFT, padx=20)
         
         # Connection Frame
-        conn_frame = ttk.LabelFrame(self.root, text="1. 🔌 ESP32 Connection", padding="10")
+        conn_frame = ttk.LabelFrame(conn_tab, text="1. 🔌 ESP32 Connection", padding="10")
         conn_frame.pack(fill=tk.X, padx=10, pady=5)
         
         port_frame = ttk.Frame(conn_frame)
@@ -93,9 +132,14 @@ class IndustrialPredictiveMaintenance:
         self.conn_status = tk.StringVar(value="❌ Not Connected")
         ttk.Label(port_frame, textvariable=self.conn_status, 
                  font=('Arial', 10, 'bold'), foreground="red").pack(side=tk.LEFT, padx=20)
+    
+    def create_sensors_tab(self):
+        # Sensor Status Tab
+        sensor_tab = ttk.Frame(self.notebook)
+        self.notebook.add(sensor_tab, text="🔍 Sensors")
         
         # Sensor Status Frame
-        sensor_frame = ttk.LabelFrame(self.root, text="2. 🔍 Sensor Status", padding="10")
+        sensor_frame = ttk.LabelFrame(sensor_tab, text="2. 🔍 Sensor Connection Status", padding="10")
         sensor_frame.pack(fill=tk.X, padx=10, pady=5)
         
         self.sensor_status = {
@@ -126,9 +170,14 @@ class IndustrialPredictiveMaintenance:
         self.check_btn = ttk.Button(sensor_frame, text="🔍 Check Sensors", 
                                     command=self.check_sensors, state=tk.DISABLED)
         self.check_btn.grid(row=2, column=5, padx=10)
+    
+    def create_data_collection_tab(self):
+        # Data Collection Tab
+        data_tab = ttk.Frame(self.notebook)
+        self.notebook.add(data_tab, text="📊 Data Collection")
         
         # Data Collection Frame
-        data_frame = ttk.LabelFrame(self.root, text="3. 📊 Data Collection", padding="10")
+        data_frame = ttk.LabelFrame(data_tab, text="3. 📊 Data Collection", padding="10")
         data_frame.pack(fill=tk.X, padx=10, pady=5)
         
         # Configuration display
@@ -175,26 +224,79 @@ class IndustrialPredictiveMaintenance:
         self.progress.pack(side=tk.LEFT, padx=5)
         self.progress_label = tk.StringVar(value="0%")
         ttk.Label(progress_frame, textvariable=self.progress_label).pack(side=tk.LEFT, padx=5)
+    
+    def create_log_tab(self):
+        # Log Tab
+        log_tab = ttk.Frame(self.notebook)
+        self.notebook.add(log_tab, text="📋 Log")
         
-        # Control Buttons Frame
-        control_frame = ttk.Frame(self.root)
-        control_frame.pack(fill=tk.X, padx=10, pady=5)
+        # Control buttons frame
+        btn_frame = ttk.Frame(log_tab)
+        btn_frame.pack(fill=tk.X, padx=10, pady=5)
         
-        ttk.Button(control_frame, text="🚀 Auto Demo", 
+        ttk.Button(btn_frame, text="🚀 Auto Demo", 
                   command=self.auto_demo).pack(side=tk.LEFT, padx=5)
-        ttk.Button(control_frame, text="📁 Open Data Folder", 
+        ttk.Button(btn_frame, text="📁 Open Data Folder", 
                   command=self.open_data_folder).pack(side=tk.LEFT, padx=5)
-        ttk.Button(control_frame, text="🗑️ Clear Log", 
+        ttk.Button(btn_frame, text="🗑️ Clear Log", 
                   command=self.clear_log).pack(side=tk.LEFT, padx=5)
-        ttk.Button(control_frame, text="❌ Disconnect", 
+        ttk.Button(btn_frame, text="❌ Disconnect", 
                   command=self.disconnect_esp32).pack(side=tk.LEFT, padx=5)
         
         # Log Frame
-        log_frame = ttk.LabelFrame(self.root, text="4. 📋 System Log", padding="10")
+        log_frame = ttk.LabelFrame(log_tab, text="5. 📋 System Log", padding="10")
         log_frame.pack(fill=tk.BOTH, expand=True, padx=10, pady=5)
         
-        self.log_text = scrolledtext.ScrolledText(log_frame, height=15, width=100)
-        self.log_text.pack(fill=tk.BOTH, expand=True)
+        self.log_text = scrolledtext.ScrolledText(log_frame, height=20, width=120, wrap=tk.WORD)
+        self.log_text.pack(fill=tk.BOTH, expand=True, padx=5, pady=5)
+        
+        # Configure text tags for better readability
+        self.log_text.tag_config("timestamp", foreground="gray")
+        self.log_text.tag_config("info", foreground="blue")
+        self.log_text.tag_config("success", foreground="green")
+        self.log_text.tag_config("error", foreground="red")
+        self.log_text.tag_config("warning", foreground="orange")
+        
+        # Bind mouse wheel events to the log text widget
+        self.log_text.bind("<MouseWheel>", self._on_mousewheel)
+        self.log_text.bind("<Button-4>", self._on_mousewheel)  # Linux scroll up
+        self.log_text.bind("<Button-5>", self._on_mousewheel)  # Linux scroll down
+        
+        # Add keyboard shortcuts for scrolling
+        self.root.bind("<Control-Prior>", lambda e: self.log_text.yview_scroll(-1, "pages"))
+        self.root.bind("<Control-Next>", lambda e: self.log_text.yview_scroll(1, "pages"))
+        self.root.bind("<Control-Home>", lambda e: self.log_text.see("1.0"))
+        self.root.bind("<Control-End>", lambda e: self.log_text.see("end"))
+        
+        # Ensure the scrollbar is always visible
+        self.log_text.config(exportselection=False)
+    
+    def create_motor_control_tab(self):
+        motor_frame = ttk.LabelFrame(self.notebook, text="Motor Control", padding=10)
+        self.notebook.add(motor_frame, text="Motor Control")
+        
+        # Status
+        self.motor_status = tk.StringVar(value="Motor: STOPPED")
+        status_frame = ttk.Frame(motor_frame)
+        status_frame.pack(fill=tk.X, pady=5)
+        ttk.Label(status_frame, textvariable=self.motor_status, 
+                 font=('Arial', 12, 'bold'), foreground="red").pack()
+        
+        # Controls
+        control_frame = ttk.Frame(motor_frame)
+        control_frame.pack(fill=tk.X, pady=10)
+        
+        ttk.Button(control_frame, text="START MOTOR", 
+                  command=self.start_motor, width=15).pack(side=tk.LEFT, padx=5)
+        ttk.Button(control_frame, text="STOP MOTOR", 
+                  command=self.stop_motor, width=15).pack(side=tk.LEFT, padx=5)
+        
+        # Direction
+        dir_frame = ttk.Frame(motor_frame)
+        dir_frame.pack(fill=tk.X, pady=5)
+        ttk.Label(dir_frame, text="Direction:").pack(side=tk.LEFT, padx=5)
+        ttk.Button(dir_frame, text="CW", command=lambda: self.set_motor_direction(1), width=8).pack(side=tk.LEFT, padx=2)
+        ttk.Button(dir_frame, text="CCW", command=lambda: self.set_motor_direction(0), width=8).pack(side=tk.LEFT, padx=2)
     
     def switch_mode(self):
         if self.mode_var.get() == "demo":
@@ -208,9 +310,28 @@ class IndustrialPredictiveMaintenance:
     
     def log(self, message):
         timestamp = datetime.now().strftime("%H:%M:%S")
-        self.log_text.insert(tk.END, f"[{timestamp}] {message}\n")
+        
+        # Determine message type and apply formatting
+        tag = "info"
+        if "✅" in message or "SUCCESS" in message or "Connected" in message:
+            tag = "success"
+        elif "❌" in message or "ERROR" in message or "Failed" in message:
+            tag = "error"
+        elif "⚠️" in message or "WARNING" in message:
+            tag = "warning"
+        elif "🔌" in message or "🔍" in message or "📊" in message or "⚙️" in message:
+            tag = "info"
+        
+        # Insert with formatting
+        self.log_text.insert(tk.END, f"[{timestamp}] ", "timestamp")
+        self.log_text.insert(tk.END, f"{message}\n", tag)
         self.log_text.see(tk.END)
         self.root.update()
+        
+        # Limit log size to prevent memory issues
+        lines = int(self.log_text.index('end-1c').split('.')[0])
+        if lines > 1000:  # Keep only last 1000 lines
+            self.log_text.delete('1.0', '100.0')
     
     def refresh_ports(self):
         ports = [port.device for port in serial.tools.list_ports.comports()]
@@ -532,12 +653,88 @@ class IndustrialPredictiveMaintenance:
             self.log(f"Could not open folder: {e}")
             messagebox.showinfo("Data Folder", f"Data location: {data_path}")
     
+    def start_motor(self):
+        if not self.serial_connection:
+            messagebox.showwarning("Warning", "Please connect to ESP32 first")
+            return
+        
+        try:
+            self.serial_connection.write(b"MOTOR_START\n")
+            time.sleep(0.5)
+            if self.serial_connection.in_waiting:
+                response = self.serial_connection.readline().decode().strip()
+                if "MOTOR_START_ACK" in response:
+                    self.motor_status.set("Motor: RUNNING")
+                    self.log("Motor Started")
+                else:
+                    self.log(f"Motor start failed: {response}")
+                    messagebox.showerror("Error", f"Motor start failed: {response}")
+        except Exception as e:
+            self.log(f"Motor start error: {e}")
+            messagebox.showerror("Error", f"Failed to start motor: {e}")
+    
+    def stop_motor(self):
+        if not self.serial_connection:
+            messagebox.showwarning("Warning", "Please connect to ESP32 first")
+            return
+        
+        try:
+            self.serial_connection.write(b"MOTOR_STOP\n")
+            time.sleep(0.5)
+            if self.serial_connection.in_waiting:
+                response = self.serial_connection.readline().decode().strip()
+                if "MOTOR_STOP_ACK" in response:
+                    self.motor_status.set("Motor: STOPPED")
+                    self.log("Motor Stopped")
+                else:
+                    self.log(f"Motor stop failed: {response}")
+        except Exception as e:
+            self.log(f"Motor stop error: {e}")
+            messagebox.showerror("Error", f"Failed to stop motor: {e}")
+    
+    def set_motor_direction(self, direction):
+        if not self.serial_connection:
+            messagebox.showwarning("Warning", "Please connect to ESP32 first")
+            return
+        
+        try:
+            cmd = f"MOTOR_DIR:{direction}\n"
+            self.serial_connection.write(cmd.encode())
+            time.sleep(0.5)
+            if self.serial_connection.in_waiting:
+                response = self.serial_connection.readline().decode().strip()
+                if "MOTOR_DIR_ACK" in response:
+                    dir_text = "CW" if direction == 1 else "CCW"
+                    self.log(f"Direction set to {dir_text}")
+        except Exception as e:
+            self.log(f"Direction error: {e}")
+            messagebox.showerror("Error", f"Failed to set motor direction: {e}")
+    
+    def _on_mousewheel(self, event):
+        # Handle mouse wheel scrolling for the log text widget
+        try:
+            if event.delta:
+                # Windows
+                delta = -1 * int(event.delta / 120)
+            else:
+                # Linux
+                if event.num == 4:
+                    delta = -1  # Scroll up
+                else:
+                    delta = 1   # Scroll down
+            
+            # Scroll the log text widget
+            self.log_text.yview_scroll(delta, "units")
+        except Exception as e:
+            # Fallback to basic scrolling if event handling fails
+            pass
+    
     def clear_log(self):
         self.log_text.delete(1.0, tk.END)
         self.log("📝 Log cleared")
 
 def main():
-    print("🏭 Starting Industrial Predictive Maintenance System - ALL IN ONE...")
+    print("Starting Industrial Predictive Maintenance System - ALL IN ONE...")
     
     root = tk.Tk()
     app = IndustrialPredictiveMaintenance(root)
@@ -545,7 +742,7 @@ def main():
     try:
         root.mainloop()
     except KeyboardInterrupt:
-        print("\n👋 System terminated")
+        print("\nSystem terminated")
 
 if __name__ == "__main__":
     main()

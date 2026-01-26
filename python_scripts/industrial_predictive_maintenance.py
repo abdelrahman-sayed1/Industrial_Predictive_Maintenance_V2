@@ -225,62 +225,10 @@ class IndustrialPredictiveMaintenance:
         self.progress_label = tk.StringVar(value="0%")
         ttk.Label(progress_frame, textvariable=self.progress_label).pack(side=tk.LEFT, padx=5)
     
-    def create_motor_control_tab(self):
-        # Motor Control Tab
-        motor_tab = ttk.Frame(self.notebook)
-        self.notebook.add(motor_tab, text="⚙️ Motor Control")
-        
-        # Motor Control Frame
-        motor_frame = ttk.LabelFrame(motor_tab, text="4. ⚙️ Motor Control", padding="10")
-        motor_frame.pack(fill=tk.X, padx=10, pady=5)
-        
-        # Motor status
-        motor_status_frame = ttk.Frame(motor_frame)
-        motor_status_frame.pack(fill=tk.X, pady=5)
-        
-        ttk.Label(motor_status_frame, text="Motor Status:", font=('Arial', 9, 'bold')).pack(side=tk.LEFT, padx=5)
-        self.motor_status = tk.StringVar(value="⏸️ Stopped")
-        ttk.Label(motor_status_frame, textvariable=self.motor_status, 
-                 font=('Arial', 10, 'bold'), foreground="red").pack(side=tk.LEFT, padx=10)
-        
-        # Motor controls
-        control_frame = ttk.Frame(motor_frame)
-        control_frame.pack(fill=tk.X, pady=5)
-        
-        # Start/Stop buttons
-        ttk.Button(control_frame, text="▶️ Start", 
-                  command=self.start_motor, width=10).pack(side=tk.LEFT, padx=5)
-        ttk.Button(control_frame, text="⏹️ Stop", 
-                  command=self.stop_motor, width=10).pack(side=tk.LEFT, padx=5)
-        
-        # Direction control
-        ttk.Label(control_frame, text="Direction:").pack(side=tk.LEFT, padx=20)
-        self.motor_dir = tk.StringVar(value="CW")
-        dir_cw = ttk.Radiobutton(control_frame, text="↻ CW", variable=self.motor_dir, 
-                                value="CW", command=self.set_motor_direction)
-        dir_cw.pack(side=tk.LEFT, padx=2)
-        dir_ccw = ttk.Radiobutton(control_frame, text="↺ CCW", variable=self.motor_dir, 
-                                 value="CCW", command=self.set_motor_direction)
-        dir_ccw.pack(side=tk.LEFT, padx=2)
-        
-        # Speed control
-        speed_frame = ttk.Frame(motor_frame)
-        speed_frame.pack(fill=tk.X, pady=5)
-        
-        ttk.Label(speed_frame, text="Speed (RPM):").pack(side=tk.LEFT, padx=5)
-        self.motor_speed = tk.IntVar(value=100)
-        self.motor_speed_scale = ttk.Scale(speed_frame, from_=10, to=1000, 
-                                         variable=self.motor_speed, orient=tk.HORIZONTAL, 
-                                         length=200, command=self.update_motor_speed)
-        self.motor_speed_scale.pack(side=tk.LEFT, padx=5)
-        self.motor_speed_label = tk.StringVar(value="100 RPM")
-        ttk.Label(speed_frame, textvariable=self.motor_speed_label, 
-                 font=('Arial', 9, 'bold')).pack(side=tk.LEFT, padx=5)
-    
     def create_log_tab(self):
         # Log Tab
         log_tab = ttk.Frame(self.notebook)
-        self.notebook.add(log_tab, text="📋 System Log")
+        self.notebook.add(log_tab, text="📋 Log")
         
         # Control buttons frame
         btn_frame = ttk.Frame(log_tab)
@@ -322,6 +270,33 @@ class IndustrialPredictiveMaintenance:
         
         # Ensure the scrollbar is always visible
         self.log_text.config(exportselection=False)
+    
+    def create_motor_control_tab(self):
+        motor_frame = ttk.LabelFrame(self.notebook, text="Motor Control", padding=10)
+        self.notebook.add(motor_frame, text="Motor Control")
+        
+        # Status
+        self.motor_status = tk.StringVar(value="Motor: STOPPED")
+        status_frame = ttk.Frame(motor_frame)
+        status_frame.pack(fill=tk.X, pady=5)
+        ttk.Label(status_frame, textvariable=self.motor_status, 
+                 font=('Arial', 12, 'bold'), foreground="red").pack()
+        
+        # Controls
+        control_frame = ttk.Frame(motor_frame)
+        control_frame.pack(fill=tk.X, pady=10)
+        
+        ttk.Button(control_frame, text="START MOTOR", 
+                  command=self.start_motor, width=15).pack(side=tk.LEFT, padx=5)
+        ttk.Button(control_frame, text="STOP MOTOR", 
+                  command=self.stop_motor, width=15).pack(side=tk.LEFT, padx=5)
+        
+        # Direction
+        dir_frame = ttk.Frame(motor_frame)
+        dir_frame.pack(fill=tk.X, pady=5)
+        ttk.Label(dir_frame, text="Direction:").pack(side=tk.LEFT, padx=5)
+        ttk.Button(dir_frame, text="CW", command=lambda: self.set_motor_direction(1), width=8).pack(side=tk.LEFT, padx=2)
+        ttk.Button(dir_frame, text="CCW", command=lambda: self.set_motor_direction(0), width=8).pack(side=tk.LEFT, padx=2)
     
     def switch_mode(self):
         if self.mode_var.get() == "demo":
@@ -684,19 +659,19 @@ class IndustrialPredictiveMaintenance:
             return
         
         try:
-            self.log("⚙️ Starting motor...")
             self.serial_connection.write(b"MOTOR_START\n")
             time.sleep(0.5)
-            
-            # Set initial speed and direction
-            self.set_motor_speed()
-            self.set_motor_direction()
-            
-            self.motor_status.set("▶️ Running")
-            self.log("✅ Motor started successfully")
-            
+            if self.serial_connection.in_waiting:
+                response = self.serial_connection.readline().decode().strip()
+                if "MOTOR_START_ACK" in response:
+                    self.motor_status.set("Motor: RUNNING")
+                    self.log("Motor Started")
+                else:
+                    self.log(f"Motor start failed: {response}")
+                    messagebox.showerror("Error", f"Motor start failed: {response}")
         except Exception as e:
-            self.log(f"❌ Failed to start motor: {e}")
+            self.log(f"Motor start error: {e}")
+            messagebox.showerror("Error", f"Failed to start motor: {e}")
     
     def stop_motor(self):
         if not self.serial_connection:
@@ -704,57 +679,36 @@ class IndustrialPredictiveMaintenance:
             return
         
         try:
-            self.log("⚙️ Stopping motor...")
             self.serial_connection.write(b"MOTOR_STOP\n")
             time.sleep(0.5)
-            
-            self.motor_status.set("⏸️ Stopped")
-            self.log("✅ Motor stopped successfully")
-            
+            if self.serial_connection.in_waiting:
+                response = self.serial_connection.readline().decode().strip()
+                if "MOTOR_STOP_ACK" in response:
+                    self.motor_status.set("Motor: STOPPED")
+                    self.log("Motor Stopped")
+                else:
+                    self.log(f"Motor stop failed: {response}")
         except Exception as e:
-            self.log(f"❌ Failed to stop motor: {e}")
+            self.log(f"Motor stop error: {e}")
+            messagebox.showerror("Error", f"Failed to stop motor: {e}")
     
-    def set_motor_speed(self):
+    def set_motor_direction(self, direction):
         if not self.serial_connection:
+            messagebox.showwarning("Warning", "Please connect to ESP32 first")
             return
         
         try:
-            speed = self.motor_speed.get()
-            self.motor_speed_label.set(f"{speed} RPM")
-            
-            command = f"MOTOR_SPEED:{speed}\n"
-            self.serial_connection.write(command.encode())
-            time.sleep(0.1)
-            
-            self.log(f"⚙️ Motor speed set to {speed} RPM")
-            
+            cmd = f"MOTOR_DIR:{direction}\n"
+            self.serial_connection.write(cmd.encode())
+            time.sleep(0.5)
+            if self.serial_connection.in_waiting:
+                response = self.serial_connection.readline().decode().strip()
+                if "MOTOR_DIR_ACK" in response:
+                    dir_text = "CW" if direction == 1 else "CCW"
+                    self.log(f"Direction set to {dir_text}")
         except Exception as e:
-            self.log(f"❌ Failed to set motor speed: {e}")
-    
-    def update_motor_speed(self, value):
-        speed = int(float(value))
-        self.motor_speed.set(speed)
-        self.motor_speed_label.set(f"{speed} RPM")
-        
-        # Update speed if motor is running
-        if self.serial_connection and self.motor_status.get().startswith("▶️"):
-            self.set_motor_speed()
-    
-    def set_motor_direction(self):
-        if not self.serial_connection:
-            return
-        
-        try:
-            direction = 1 if self.motor_dir.get() == "CW" else 0
-            command = f"MOTOR_DIR:{direction}\n"
-            self.serial_connection.write(command.encode())
-            time.sleep(0.1)
-            
-            dir_text = "Clockwise" if direction == 1 else "Counter-Clockwise"
-            self.log(f"⚙️ Motor direction set to {dir_text}")
-            
-        except Exception as e:
-            self.log(f"❌ Failed to set motor direction: {e}")
+            self.log(f"Direction error: {e}")
+            messagebox.showerror("Error", f"Failed to set motor direction: {e}")
     
     def _on_mousewheel(self, event):
         # Handle mouse wheel scrolling for the log text widget
@@ -780,7 +734,7 @@ class IndustrialPredictiveMaintenance:
         self.log("📝 Log cleared")
 
 def main():
-    print("🏭 Starting Industrial Predictive Maintenance System - ALL IN ONE...")
+    print("Starting Industrial Predictive Maintenance System - ALL IN ONE...")
     
     root = tk.Tk()
     app = IndustrialPredictiveMaintenance(root)
@@ -788,7 +742,7 @@ def main():
     try:
         root.mainloop()
     except KeyboardInterrupt:
-        print("\n👋 System terminated")
+        print("\nSystem terminated")
 
 if __name__ == "__main__":
     main()

@@ -1,4 +1,8 @@
 #include "data_collector.h"
+
+// Motor control variables
+volatile bool motorRunning = false;
+
 #include "../../include/types.h"
 #include "../../include/config.h"
 #include "../../lib/MPU6050/MPU6050.h"
@@ -37,7 +41,32 @@ void DataCollector::waitForCommand() {
         String command = Serial.readStringUntil('\n');
         command.trim();
         
-        if (command == "START_NORMAL") {
+        if (command == "MOTOR_START") {
+            pinMode(DRV8825_STEP_PIN, OUTPUT);
+            pinMode(DRV8825_DIR_PIN, OUTPUT);
+            pinMode(DRV8825_ENABLE_PIN, OUTPUT);
+            digitalWrite(DRV8825_DIR_PIN, HIGH);
+            digitalWrite(DRV8825_ENABLE_PIN, LOW);
+            motorRunning = true;
+            Serial.println("MOTOR_START_ACK");
+        }
+        else if (command == "MOTOR_STOP") {
+            motorRunning = false;
+            digitalWrite(DRV8825_ENABLE_PIN, HIGH);
+            Serial.println("MOTOR_STOP_ACK");
+        }
+        else if (command.startsWith("MOTOR_DIR")) {
+            int dir = command.substring(10).toInt();
+            digitalWrite(DRV8825_DIR_PIN, dir == 1 ? HIGH : LOW);
+            Serial.println("MOTOR_DIR_ACK:" + String(dir));
+        }
+        else if (command == "PING") {
+            Serial.println("PONG");
+        }
+        else if (command == "CHECK_SENSORS") {
+            checkSensorStatus();
+        }
+        else if (command == "START_NORMAL") {
             collectSession("normal", 5);
         }
         else if (command == "START_IMBALANCE") {
@@ -51,28 +80,6 @@ void DataCollector::waitForCommand() {
         }
         else if (command == "START_LOOSENESS") {
             collectSession("looseness", 5);
-        }
-        else if (command == "PING") {
-            Serial.println("PONG");
-        }
-        else if (command == "CHECK_SENSORS") {
-            checkSensorStatus();
-        }
-        else if (command == "MOTOR_START") {
-            Serial.println("MOTOR_START_ACK");
-        }
-        else if (command == "MOTOR_STOP") {
-            Serial.println("MOTOR_STOP_ACK");
-        }
-        else if (command.startsWith("MOTOR_SPEED")) {
-            // Format: MOTOR_SPEED:100 (RPM)
-            int speed = command.substring(12).toInt();
-            Serial.println("MOTOR_SPEED_ACK:" + String(speed));
-        }
-        else if (command.startsWith("MOTOR_DIR")) {
-            // Format: MOTOR_DIR:1 (CW) or MOTOR_DIR:0 (CCW)
-            int dir = command.substring(10).toInt();
-            Serial.println("MOTOR_DIR_ACK:" + String(dir));
         }
     }
 }
@@ -112,6 +119,7 @@ void DataCollector::collectSession(String label, int durationMinutes) {
         Serial.println(temperature, 2);
         
         sampleCount++;
+        
         delay(4000);  // 4-second window
     }
     
@@ -140,7 +148,7 @@ void DataCollector::collectVibrationData(float* accel_x, float* accel_y, float* 
         Serial.print(",");
         Serial.println(gyro_z, 4);
         
-        delayMicroseconds(20000);  // 50Hz sampling
+        delayMicroseconds(20000);  // 50Hz sampling - no motor stepping during data collection
     }
 }
 

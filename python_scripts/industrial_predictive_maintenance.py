@@ -1,357 +1,106 @@
 #!/usr/bin/env python3
 """
-Industrial Predictive Maintenance System - ALL IN ONE
-Complete system with GUI, sensor checking, data collection, and demo mode
+Industrial Predictive Maintenance - Professional GUI
+Clean, professional interface for sensor data collection and motor control
 """
 
 import tkinter as tk
-from tkinter import ttk, messagebox, scrolledtext
+from tkinter import ttk, messagebox, filedialog
 import serial
 import serial.tools.list_ports
 import threading
 import time
-import os
 import csv
+import os
 from datetime import datetime
-import random
-import platform
-import subprocess
+import queue
 
-class IndustrialPredictiveMaintenance:
+class IndustrialMaintenanceGUI:
     def __init__(self, root):
         self.root = root
-        self.root.title("🏭 Industrial Predictive Maintenance - ALL IN ONE")
-        self.root.geometry("1400x800")
-        self.root.minsize(1200, 700)
+        self.root.title("Industrial Predictive Maintenance System")
+        self.root.geometry("1200x800")
+        self.root.configure(bg='#f0f0f0')
         
-        # Create main container with notebook (tabs)
-        self.notebook = ttk.Notebook(self.root)
-        self.notebook.pack(fill=tk.BOTH, expand=True, padx=5, pady=5)
-        
-        # System variables
+        # Variables
         self.serial_connection = None
         self.is_collecting = False
-        self.demo_mode = False
-        self.collected_data = []
+        self.motor_running = False
+        self.data_queue = queue.Queue()
+        self.collected_data = []  # Store actual sensor data
+        self.collection_start_time = None  # Track when collection started
+        self.data_points = 0
+        self.status_var = tk.StringVar(value="Ready")
         
-        # Create main interface
-        self.create_main_interface()
-        self.refresh_ports()
+        # Create main container
+        main_frame = ttk.Frame(root, padding="10")
+        main_frame.grid(row=0, column=0, sticky=(tk.W, tk.E, tk.N, tk.S))
         
-        # Configure grid weights for proper resizing
-        self.root.grid_rowconfigure(0, weight=1)
-        self.root.grid_columnconfigure(0, weight=1)
+        # Configure grid weights
+        root.columnconfigure(0, weight=1)
+        root.rowconfigure(0, weight=1)
+        main_frame.columnconfigure(1, weight=1)
+        main_frame.rowconfigure(2, weight=1)
         
-        # Auto-start with welcome message
-        self.log("🎯 INDUSTRIAL PREDICTIVE MAINTENANCE SYSTEM - ALL IN ONE")
-        self.log("=" * 70)
-        self.log("Features:")
-        self.log("  ✅ ESP32 Connection & Communication")
-        self.log("  ✅ Real-time Sensor Status Checking")
-        self.log("  ✅ Data Collection & Storage")
-        self.log("  ✅ Motor Control")
-        self.log("  ✅ Automated Demo Mode")
-        self.log("  ✅ CSV Export for ML Training")
-        self.log("=" * 70)
-        self.log("Ready to connect to your ESP32!")
-    
-    def create_main_interface(self):
-        # Create tabs
-        self.create_connection_tab()
-        self.create_sensors_tab()
-        self.create_data_collection_tab()
-        self.create_motor_control_tab()
-        self.create_log_tab()
+        # Create sections
+        self.create_connection_section(main_frame)
+        self.create_motor_control_section(main_frame)
+        self.create_sensor_check_section(main_frame)
+        self.create_data_collection_section(main_frame)
+        self.create_log_section(main_frame)
         
-        # Configure grid weights for proper resizing
-        self.root.grid_rowconfigure(0, weight=1)
-        self.root.grid_columnconfigure(0, weight=1)
-        
-        # Auto-start with welcome message
-        self.log("🎯 INDUSTRIAL PREDICTIVE MAINTENANCE SYSTEM - ALL IN ONE")
-        self.log("=" * 70)
-        self.log("Features:")
-        self.log("  ✅ ESP32 Connection & Communication")
-        self.log("  ✅ Real-time Sensor Status Checking")
-        self.log("  ✅ Data Collection & Storage")
-        self.log("  ✅ Motor Control")
-        self.log("  ✅ Automated Demo Mode")
-        self.log("  ✅ CSV Export for ML Training")
-        self.log("=" * 70)
-        self.log("Ready to connect to your ESP32!")
-    
-    def create_connection_tab(self):
-        # Connection Tab
-        conn_tab = ttk.Frame(self.notebook)
-        self.notebook.add(conn_tab, text="🔌 Connection")
-        
-        # Title Frame
-        title_frame = ttk.Frame(conn_tab)
-        title_frame.pack(fill=tk.X, padx=10, pady=5)
-        
-        title_label = ttk.Label(title_frame, text="🏭 INDUSTRIAL PREDICTIVE MAINTENANCE", 
-                                font=('Arial', 18, 'bold'))
-        title_label.pack()
-        
-        subtitle = ttk.Label(title_frame, text="Complete System: Connection → Sensor Check → Data Collection → Motor Control", 
-                            font=('Arial', 10))
-        subtitle.pack()
-        
-        # Mode Selection Frame
-        mode_frame = ttk.LabelFrame(conn_tab, text="🎛️ System Mode", padding="10")
-        mode_frame.pack(fill=tk.X, padx=10, pady=5)
-        
-        self.mode_var = tk.StringVar(value="manual")
-        ttk.Radiobutton(mode_frame, text="🔧 Manual Mode", variable=self.mode_var, 
-                       value="manual", command=self.switch_mode).pack(side=tk.LEFT, padx=10)
-        ttk.Radiobutton(mode_frame, text="🚀 Demo Mode", variable=self.mode_var, 
-                       value="demo", command=self.switch_mode).pack(side=tk.LEFT, padx=10)
-        
-        self.mode_status = tk.StringVar(value="🔧 Manual Mode - Full Control")
-        ttk.Label(mode_frame, textvariable=self.mode_status, 
-                 font=('Arial', 10, 'bold')).pack(side=tk.LEFT, padx=20)
-        
-        # Connection Frame
-        conn_frame = ttk.LabelFrame(conn_tab, text="1. 🔌 ESP32 Connection", padding="10")
-        conn_frame.pack(fill=tk.X, padx=10, pady=5)
-        
-        port_frame = ttk.Frame(conn_frame)
-        port_frame.pack(fill=tk.X, pady=5)
-        
-        ttk.Label(port_frame, text="Serial Port:").pack(side=tk.LEFT, padx=5)
-        self.port_var = tk.StringVar()
-        self.port_combo = ttk.Combobox(port_frame, textvariable=self.port_var, width=20)
-        self.port_combo.pack(side=tk.LEFT, padx=5)
-        
-        ttk.Button(port_frame, text="🔄 Refresh", 
-                  command=self.refresh_ports).pack(side=tk.LEFT, padx=5)
-        self.connect_btn = ttk.Button(port_frame, text="🔌 Connect", 
-                                     command=self.connect_esp32)
-        self.connect_btn.pack(side=tk.LEFT, padx=5)
-        
-        self.conn_status = tk.StringVar(value="❌ Not Connected")
-        ttk.Label(port_frame, textvariable=self.conn_status, 
-                 font=('Arial', 10, 'bold'), foreground="red").pack(side=tk.LEFT, padx=20)
-    
-    def create_sensors_tab(self):
-        # Sensor Status Tab
-        sensor_tab = ttk.Frame(self.notebook)
-        self.notebook.add(sensor_tab, text="🔍 Sensors")
-        
-        # Sensor Status Frame
-        sensor_frame = ttk.LabelFrame(sensor_tab, text="2. 🔍 Sensor Connection Status", padding="10")
-        sensor_frame.pack(fill=tk.X, padx=10, pady=5)
-        
-        self.sensor_status = {
-            'mpu6050': tk.StringVar(value="⏳ Waiting..."),
-            'encoder': tk.StringVar(value="⏳ Waiting..."),
-            'max471': tk.StringVar(value="⏳ Waiting..."),
-            'ds18b20': tk.StringVar(value="⏳ Waiting..."),
-            'motor_driver': tk.StringVar(value="⏳ Waiting...")
-        }
-        
-        sensors = [
-            ("MPU6050", "mpu6050", "Accelerometer/Gyro"),
-            ("Encoder", "encoder", "RPM Sensor"),
-            ("MAX471", "max471", "Current Sensor"),
-            ("DS18B20", "ds18b20", "Temperature Sensor"),
-            ("DRV8825", "motor_driver", "Motor Driver")
-        ]
-        
-        for i, (name, key, desc) in enumerate(sensors):
-            row = i // 3
-            col = (i % 3) * 2
-            
-            ttk.Label(sensor_frame, text=f"{name}:", font=('Arial', 9, 'bold')).grid(
-                row=row, column=col, sticky=tk.W, padx=5)
-            ttk.Label(sensor_frame, textvariable=self.sensor_status[key], 
-                     font=('Arial', 9)).grid(row=row, column=col+1, sticky=tk.W, padx=5)
-        
-        self.check_btn = ttk.Button(sensor_frame, text="🔍 Check Sensors", 
-                                    command=self.check_sensors, state=tk.DISABLED)
-        self.check_btn.grid(row=2, column=5, padx=10)
-    
-    def create_data_collection_tab(self):
-        # Data Collection Tab
-        data_tab = ttk.Frame(self.notebook)
-        self.notebook.add(data_tab, text="📊 Data Collection")
-        
-        # Data Collection Frame
-        data_frame = ttk.LabelFrame(data_tab, text="3. 📊 Data Collection", padding="10")
-        data_frame.pack(fill=tk.X, padx=10, pady=5)
-        
-        # Configuration display
-        config_display = ttk.Frame(data_frame)
-        config_display.pack(fill=tk.X, pady=5)
-        
-        ttk.Label(config_display, text="📊 Current Config:", font=('Arial', 9, 'bold')).pack(side=tk.LEFT, padx=5)
-        ttk.Label(config_display, text="Acc+Gyro (6 channels)", foreground="blue").pack(side=tk.LEFT, padx=5)
-        ttk.Label(config_display, text="50Hz", foreground="blue").pack(side=tk.LEFT, padx=5)
-        ttk.Label(config_display, text="4s windows", foreground="blue").pack(side=tk.LEFT, padx=5)
-        ttk.Label(config_display, text="200 samples/window", foreground="blue").pack(side=tk.LEFT, padx=5)
-        
-        config_frame = ttk.Frame(data_frame)
-        config_frame.pack(fill=tk.X, pady=5)
-        
-        ttk.Label(config_frame, text="Data Label:").pack(side=tk.LEFT, padx=5)
-        self.label_var = tk.StringVar(value="normal")
-        label_combo = ttk.Combobox(config_frame, textvariable=self.label_var, 
-                                  values=["normal", "imbalance", "misalignment", 
-                                         "bearing_defect", "looseness"], width=15)
-        label_combo.pack(side=tk.LEFT, padx=5)
-        
-        ttk.Label(config_frame, text="Duration (sec):").pack(side=tk.LEFT, padx=20)
-        self.duration_var = tk.StringVar(value="20")  # 5 windows of 4 seconds each
-        duration_entry = ttk.Entry(config_frame, textvariable=self.duration_var, width=5)
-        duration_entry.pack(side=tk.LEFT, padx=5)
-        
-        ttk.Label(config_frame, text="(4s windows)", font=('Arial', 8), foreground="gray").pack(side=tk.LEFT, padx=2)
-        
-        self.collect_btn = ttk.Button(config_frame, text="📊 Start Collection", 
-                                     command=self.start_collection, state=tk.DISABLED)
-        self.collect_btn.pack(side=tk.LEFT, padx=20)
-        
-        self.collection_status = tk.StringVar(value="⏸️ Ready to collect")
-        ttk.Label(data_frame, textvariable=self.collection_status, 
-                 font=('Arial', 10, 'bold')).pack(pady=5)
-        
-        # Progress Frame
-        progress_frame = ttk.Frame(data_frame)
-        progress_frame.pack(fill=tk.X, pady=5)
-        
-        ttk.Label(progress_frame, text="Progress:").pack(side=tk.LEFT, padx=5)
-        self.progress = ttk.Progressbar(progress_frame, mode='determinate', length=300)
-        self.progress.pack(side=tk.LEFT, padx=5)
-        self.progress_label = tk.StringVar(value="0%")
-        ttk.Label(progress_frame, textvariable=self.progress_label).pack(side=tk.LEFT, padx=5)
-    
-    def create_log_tab(self):
-        # Log Tab
-        log_tab = ttk.Frame(self.notebook)
-        self.notebook.add(log_tab, text="📋 Log")
-        
-        # Control buttons frame
-        btn_frame = ttk.Frame(log_tab)
-        btn_frame.pack(fill=tk.X, padx=10, pady=5)
-        
-        ttk.Button(btn_frame, text="🚀 Auto Demo", 
-                  command=self.auto_demo).pack(side=tk.LEFT, padx=5)
-        ttk.Button(btn_frame, text="📁 Open Data Folder", 
-                  command=self.open_data_folder).pack(side=tk.LEFT, padx=5)
-        ttk.Button(btn_frame, text="🗑️ Clear Log", 
-                  command=self.clear_log).pack(side=tk.LEFT, padx=5)
-        ttk.Button(btn_frame, text="❌ Disconnect", 
-                  command=self.disconnect_esp32).pack(side=tk.LEFT, padx=5)
-        
-        # Log Frame
-        log_frame = ttk.LabelFrame(log_tab, text="5. 📋 System Log", padding="10")
-        log_frame.pack(fill=tk.BOTH, expand=True, padx=10, pady=5)
-        
-        self.log_text = scrolledtext.ScrolledText(log_frame, height=20, width=120, wrap=tk.WORD)
-        self.log_text.pack(fill=tk.BOTH, expand=True, padx=5, pady=5)
-        
-        # Configure text tags for better readability
-        self.log_text.tag_config("timestamp", foreground="gray")
-        self.log_text.tag_config("info", foreground="blue")
-        self.log_text.tag_config("success", foreground="green")
-        self.log_text.tag_config("error", foreground="red")
-        self.log_text.tag_config("warning", foreground="orange")
-        
-        # Bind mouse wheel events to the log text widget
-        self.log_text.bind("<MouseWheel>", self._on_mousewheel)
-        self.log_text.bind("<Button-4>", self._on_mousewheel)  # Linux scroll up
-        self.log_text.bind("<Button-5>", self._on_mousewheel)  # Linux scroll down
-        
-        # Add keyboard shortcuts for scrolling
-        self.root.bind("<Control-Prior>", lambda e: self.log_text.yview_scroll(-1, "pages"))
-        self.root.bind("<Control-Next>", lambda e: self.log_text.yview_scroll(1, "pages"))
-        self.root.bind("<Control-Home>", lambda e: self.log_text.see("1.0"))
-        self.root.bind("<Control-End>", lambda e: self.log_text.see("end"))
-        
-        # Ensure the scrollbar is always visible
-        self.log_text.config(exportselection=False)
-    
-    def create_motor_control_tab(self):
-        motor_frame = ttk.LabelFrame(self.notebook, text="Motor Control", padding=10)
-        self.notebook.add(motor_frame, text="Motor Control")
-        
-        # Status
-        self.motor_status = tk.StringVar(value="Motor: STOPPED")
-        status_frame = ttk.Frame(motor_frame)
-        status_frame.pack(fill=tk.X, pady=5)
-        ttk.Label(status_frame, textvariable=self.motor_status, 
-                 font=('Arial', 12, 'bold'), foreground="red").pack()
-        
-        # Controls
-        control_frame = ttk.Frame(motor_frame)
-        control_frame.pack(fill=tk.X, pady=10)
-        
-        ttk.Button(control_frame, text="START MOTOR", 
-                  command=self.start_motor, width=15).pack(side=tk.LEFT, padx=5)
-        ttk.Button(control_frame, text="STOP MOTOR", 
-                  command=self.stop_motor, width=15).pack(side=tk.LEFT, padx=5)
-        
-        # Direction
-        dir_frame = ttk.Frame(motor_frame)
-        dir_frame.pack(fill=tk.X, pady=5)
-        ttk.Label(dir_frame, text="Direction:").pack(side=tk.LEFT, padx=5)
-        ttk.Button(dir_frame, text="CW", command=lambda: self.set_motor_direction(1), width=8).pack(side=tk.LEFT, padx=2)
-        ttk.Button(dir_frame, text="CCW", command=lambda: self.set_motor_direction(0), width=8).pack(side=tk.LEFT, padx=2)
-    
-    def switch_mode(self):
-        if self.mode_var.get() == "demo":
-            self.demo_mode = True
-            self.mode_status.set("🚀 Demo Mode - Automated Workflow")
-            self.log("🚀 Switched to Demo Mode - Ready for automated workflow")
-        else:
-            self.demo_mode = False
-            self.mode_status.set("🔧 Manual Mode - Full Control")
-            self.log("🔧 Switched to Manual Mode - Full control available")
+        # Status bar
+        status_bar = ttk.Label(main_frame, textvariable=self.status_var, relief=tk.SUNKEN)
+        status_bar.grid(row=5, column=0, columnspan=2, sticky=(tk.W, tk.E), pady=(10, 0))
     
     def log(self, message):
+        """Add message to log"""
         timestamp = datetime.now().strftime("%H:%M:%S")
+        if hasattr(self, 'log_text'):
+            self.log_text.insert(tk.END, f"[{timestamp}] {message}\n")
+            self.log_text.see(tk.END)
+        if hasattr(self, 'status_var'):
+            self.status_var.set(message)
+    
+    def create_connection_section(self, parent):
+        """Serial connection section"""
+        frame = ttk.LabelFrame(parent, text="Serial Connection", padding="10")
+        frame.grid(row=0, column=0, columnspan=2, sticky=(tk.W, tk.E), pady=(0, 10))
+        frame.columnconfigure(1, weight=1)
         
-        # Determine message type and apply formatting
-        tag = "info"
-        if "✅" in message or "SUCCESS" in message or "Connected" in message:
-            tag = "success"
-        elif "❌" in message or "ERROR" in message or "Failed" in message:
-            tag = "error"
-        elif "⚠️" in message or "WARNING" in message:
-            tag = "warning"
-        elif "🔌" in message or "🔍" in message or "📊" in message or "⚙️" in message:
-            tag = "info"
+        # Port selection
+        ttk.Label(frame, text="Port:").grid(row=0, column=0, sticky=tk.W, padx=(0, 5))
+        self.port_var = tk.StringVar()
+        self.port_combo = ttk.Combobox(frame, textvariable=self.port_var, width=20)
+        self.port_combo.grid(row=0, column=1, sticky=(tk.W, tk.E), padx=(0, 5))
         
-        # Insert with formatting
-        self.log_text.insert(tk.END, f"[{timestamp}] ", "timestamp")
-        self.log_text.insert(tk.END, f"{message}\n", tag)
-        self.log_text.see(tk.END)
-        self.root.update()
+        # Buttons
+        ttk.Button(frame, text="Refresh Ports", command=self.refresh_ports).grid(row=0, column=2, padx=5)
+        ttk.Button(frame, text="Connect", command=self.connect_serial).grid(row=0, column=3, padx=5)
+        ttk.Button(frame, text="Disconnect", command=self.disconnect_serial).grid(row=0, column=4, padx=5)
         
-        # Limit log size to prevent memory issues
-        lines = int(self.log_text.index('end-1c').split('.')[0])
-        if lines > 1000:  # Keep only last 1000 lines
-            self.log_text.delete('1.0', '100.0')
+        # Connection status
+        self.connection_status = tk.StringVar(value="Disconnected")
+        ttk.Label(frame, textvariable=self.connection_status, foreground="red").grid(row=0, column=5, padx=(10, 0))
+        
+        self.refresh_ports()
     
     def refresh_ports(self):
+        """Refresh available serial ports"""
         ports = [port.device for port in serial.tools.list_ports.comports()]
         self.port_combo['values'] = ports
         if ports:
             self.port_combo.set(ports[0])
-            self.log(f"🔍 Found {len(ports)} serial ports: {', '.join(ports)}")
-        else:
-            self.log("⚠️ No serial ports found")
+        self.log(f"Found {len(ports)} serial ports")
     
-    def connect_esp32(self):
+    def connect_serial(self):
+        """Connect to serial port"""
         if not self.port_var.get():
             messagebox.showerror("Error", "Please select a serial port")
             return
         
         try:
-            self.log(f"🔌 Connecting to {self.port_var.get()}...")
-            self.serial_connection = serial.Serial(
-                self.port_var.get(), 115200, timeout=2
-            )
+            self.serial_connection = serial.Serial(self.port_var.get(), 921600, timeout=2)
             time.sleep(2)
             
             # Test connection
@@ -361,388 +110,493 @@ class IndustrialPredictiveMaintenance:
             if self.serial_connection.in_waiting:
                 response = self.serial_connection.readline().decode().strip()
                 if "PONG" in response:
-                    self.conn_status.set("✅ Connected")
-                    self.log("✅ ESP32 Connected Successfully!")
-                    self.connect_btn.config(state=tk.DISABLED)
-                    self.check_btn.config(state=tk.NORMAL)
+                    self.connection_status.set("Connected")
+                    self.log(f"Connected to {self.port_var.get()}")
+                    
+                    # Enable controls
+                    self.start_motor_btn.config(state=tk.NORMAL)
+                    self.stop_motor_btn.config(state=tk.NORMAL)
                     self.collect_btn.config(state=tk.NORMAL)
-                    self.progress['value'] = 25
                     
-                    # Auto-check sensors in demo mode
-                    if self.demo_mode:
-                        self.root.after(1000, self.check_sensors)
-                    return True
-            
-            self.log("❌ ESP32 did not respond to PING")
-            return False
-            
+                    # Start data reader thread
+                    self.start_data_reader()
+                else:
+                    raise Exception("No PONG response")
+            else:
+                raise Exception("No response from device")
+                
         except Exception as e:
-            self.log(f"❌ Connection failed: {e}")
-            self.conn_status.set("❌ Connection Failed")
-            return False
+            messagebox.showerror("Connection Error", f"Failed to connect: {e}")
+            self.log(f"Connection failed: {e}")
     
-    def disconnect_esp32(self):
+    def disconnect_serial(self):
+        """Disconnect serial connection"""
         if self.serial_connection:
-            try:
-                self.serial_connection.close()
-                self.serial_connection = None
-                self.conn_status.set("❌ Not Connected")
-                self.connect_btn.config(state=tk.NORMAL)
-                self.check_btn.config(state=tk.DISABLED)
-                self.collect_btn.config(state=tk.DISABLED)
-                self.log("🔌 Disconnected from ESP32")
-                
-                # Reset sensor status
-                for key in self.sensor_status:
-                    self.sensor_status[key].set("⏳ Waiting...")
-                    
-            except Exception as e:
-                self.log(f"❌ Disconnect error: {e}")
+            self.serial_connection.close()
+            self.serial_connection = None
+            
+        self.connection_status.set("Disconnected")
+        self.log("Disconnected from serial port")
+        
+        # Disable controls
+        self.start_motor_btn.config(state=tk.DISABLED)
+        self.stop_motor_btn.config(state=tk.DISABLED)
+        self.collect_btn.config(state=tk.DISABLED)
     
-    def check_sensors(self):
-        if not self.serial_connection:
-            messagebox.showwarning("Warning", "Please connect to ESP32 first")
-            return
-        
-        self.log("🔍 Checking sensor connections...")
-        
-        # Reset sensor status
-        for key in self.sensor_status:
-            self.sensor_status[key].set("🔄 Checking...")
-        
-        try:
-            self.serial_connection.write(b"CHECK_SENSORS\n")
-            time.sleep(0.5)
-            
-            timeout = 5
-            start_time = time.time()
-            sensors_found = []
-            
-            while time.time() - start_time < timeout:
+    def start_data_reader(self):
+        """Start thread to read serial data"""
+        def reader():
+            while self.serial_connection and self.serial_connection.is_open:
                 if self.serial_connection.in_waiting:
-                    try:
-                        line = self.serial_connection.readline().decode("utf-8", errors="ignore").strip()
-                        if line:
-                            self.log(f"ESP32: {line}")
-                            
-                            # Parse sensor responses
-                            if "MPU6050:" in line:
-                                if "OK" in line:
-                                    self.sensor_status['mpu6050'].set("✅ Connected")
-                                    sensors_found.append("MPU6050")
-                                else:
-                                    self.sensor_status['mpu6050'].set("❌ Not Connected")
-                            
-                            elif "Encoder:" in line:
-                                if "OK" in line:
-                                    self.sensor_status['encoder'].set("✅ Connected")
-                                    sensors_found.append("Encoder")
-                                else:
-                                    self.sensor_status['encoder'].set("❌ Not Connected")
-                            
-                            elif "MAX471:" in line:
-                                if "OK" in line:
-                                    self.sensor_status['max471'].set("✅ Connected")
-                                    sensors_found.append("MAX471")
-                                else:
-                                    self.sensor_status['max471'].set("❌ Not Connected")
-                            
-                            elif "DS18B20:" in line:
-                                if "OK" in line:
-                                    self.sensor_status['ds18b20'].set("✅ Connected")
-                                    sensors_found.append("DS18B20")
-                                else:
-                                    self.sensor_status['ds18b20'].set("❌ Not Connected")
-                            
-                            elif "DRV8825:" in line:
-                                if "OK" in line:
-                                    self.sensor_status['motor_driver'].set("✅ Connected")
-                                    sensors_found.append("DRV8825")
-                                else:
-                                    self.sensor_status['motor_driver'].set("❌ Not Connected")
-                            
-                            elif "SENSOR_CHECK_COMPLETE" in line:
-                                self.log(f"✅ Sensor check complete! Found {len(sensors_found)} sensors")
-                                self.progress['value'] = 50
-                                break
-                                
-                    except Exception as e:
-                        self.log(f"Error parsing response: {e}")
-                
-                time.sleep(0.1)
-            
-            # Check for any sensors still checking
-            for key, status_var in self.sensor_status.items():
-                if status_var.get() == "🔄 Checking...":
-                    status_var.set("⚠️ No Response")
-            
-            # Auto-start collection in demo mode
-            if self.demo_mode and sensors_found:
-                self.root.after(2000, self.start_collection)
-                    
-        except Exception as e:
-            self.log(f"❌ Sensor check failed: {e}")
-            for key in self.sensor_status:
-                self.sensor_status[key].set("❌ Error")
-    
-    def start_collection(self):
-        if not self.serial_connection:
-            messagebox.showwarning("Warning", "Please connect to ESP32 first")
-            return
-        
-        if self.is_collecting:
-            messagebox.showinfo("Info", "Collection already in progress")
-            return
-        
-        try:
-            duration = int(self.duration_var.get())
-            label = self.label_var.get()
-            
-            self.log(f"📊 Starting {label} data collection for {duration} seconds...")
-            self.collection_status.set("🔄 Collecting...")
-            self.is_collecting = True
-            self.collect_btn.config(state=tk.DISABLED)
-            
-            # Start collection in thread
-            thread = threading.Thread(target=self._collect_data, args=(label, duration))
-            thread.daemon = True
-            thread.start()
-            
-        except ValueError:
-            messagebox.showerror("Error", "Please enter a valid duration")
-    
-    def _collect_data(self, label, duration):
-        try:
-            # Send start command
-            command = f"START_{label.upper()}\n"
-            self.serial_connection.write(command.encode())
-            
-            # Simulate collection progress
-            for i in range(duration):
-                if not self.is_collecting:
-                    break
-                
-                progress = (i + 1) / duration * 50  # 50% of total progress
-                self.progress['value'] = 50 + progress / 2
-                self.progress_label.set(f"{int(50 + progress / 2)}%")
-                
-                # Read any incoming data
-                while self.serial_connection.in_waiting:
                     line = self.serial_connection.readline().decode().strip()
                     if line:
-                        self.log(f"ESP32: {line}")
-                        self.collected_data.append(line)
-                
-                time.sleep(1)
-            
-            self.is_collecting = False
-            self.collection_status.set("✅ Collection Complete")
-            self.log(f"✅ Data collection complete! Collected {len(self.collected_data)} data points")
-            
-            # Save data
-            self.save_data(label)
-            
-            self.progress['value'] = 100
-            self.progress_label.set("100%")
-            self.collect_btn.config(state=tk.NORMAL)
-            
-        except Exception as e:
-            self.log(f"❌ Collection error: {e}")
-            self.is_collecting = False
-            self.collection_status.set("❌ Collection Failed")
-            self.collect_btn.config(state=tk.NORMAL)
-    
-    def save_data(self, label):
-        try:
-            # Create session folder
-            timestamp = datetime.now().strftime("%Y-%m-%d_%H-%M-%S")
-            session_dir = f"../collected_data/edge_impulse/session_{timestamp}"
-            os.makedirs(session_dir, exist_ok=True)
-            
-            # Create CSV file with Acc+Gyro data (6 channels)
-            csv_file = f"{session_dir}/{label}.csv"
-            
-            with open(csv_file, 'w', newline='') as f:
-                writer = csv.writer(f)
-                writer.writerow(['timestamp', 'accX', 'accY', 'accZ', 'gyroX', 'gyroY', 'gyroZ'])
-                
-                # Parse collected data from ESP32
-                window_data = []
-                for line in self.collected_data:
-                    if ',' in line and not line.startswith('RAW_WINDOW') and not line.startswith('COLLECTION'):
-                        parts = line.strip().split(',')
-                        if len(parts) == 6:  # Acc+Gyro data
-                            try:
-                                acc_x, acc_y, acc_z, gyro_x, gyro_y, gyro_z = map(float, parts)
-                                timestamp = len(window_data) * 0.02  # 50Hz = 20ms intervals
-                                writer.writerow([f"{timestamp:.3f}", f"{acc_x:.4f}", f"{acc_y:.4f}", f"{acc_z:.4f}", f"{gyro_x:.4f}", f"{gyro_y:.4f}", f"{gyro_z:.4f}"])
-                                window_data.append(line)
-                            except ValueError:
-                                continue
-                
-                # If no real data, generate sample data
-                if len(window_data) == 0:
-                    for i in range(200):  # 200 samples for 4-second window at 50Hz
-                        t = i * 0.02  # 50Hz sampling
-                        acc_x = random.uniform(-2, 2)
-                        acc_y = random.uniform(-2, 2)
-                        acc_z = random.uniform(-2, 2)
-                        gyro_x = random.uniform(-180, 180)
-                        gyro_y = random.uniform(-180, 180)
-                        gyro_z = random.uniform(-180, 180)
-                        writer.writerow([f"{t:.3f}", f"{acc_x:.4f}", f"{acc_y:.4f}", f"{acc_z:.4f}", f"{gyro_x:.4f}", f"{gyro_y:.4f}", f"{gyro_z:.4f}"])
-            
-            self.log(f"💾 Data saved to: {csv_file}")
-            self.log(f"📁 Session folder: {session_dir}")
-            self.log(f"📊 Format: Acc+Gyro, 50Hz, 4-second windows (200 samples)")
-            
-        except Exception as e:
-            self.log(f"❌ Save error: {e}")
-    
-    def auto_demo(self):
-        self.log("🚀 Starting Automated Demo...")
-        self.mode_var.set("demo")
-        self.switch_mode()
-        self.progress['value'] = 0
+                        self.data_queue.put(line)
+                time.sleep(0.01)
         
-        # Auto-execute demo steps
-        self.root.after(1000, self._demo_step_connect)
+        thread = threading.Thread(target=reader, daemon=True)
+        thread.start()
+        
+        # Start queue processor
+        self.process_data_queue()
     
-    def _demo_step_connect(self):
-        self.log("🔌 Step 1: Connecting to ESP32...")
-        if self.connect_esp32():
-            self.root.after(2000, self._demo_step_sensors)
+    def process_data_queue(self):
+        """Process data from queue"""
+        try:
+            while not self.data_queue.empty():
+                line = self.data_queue.get_nowait()
+                self.process_serial_line(line)
+        except queue.Empty:
+            pass
+        
+        # Schedule next check
+        self.root.after(50, self.process_data_queue)
+    
+    def process_serial_line(self, line):
+        """Process incoming serial line"""
+        if line.startswith("MOTOR_"):
+            self.process_motor_status(line)
+        elif line.startswith("SENSOR_"):
+            self.process_sensor_status(line)
+        elif line.startswith("COLLECTION_"):
+            self.process_collection_status(line)
+        elif "_DATA:" in line:
+            self.process_sensor_data(line)
+        elif line.startswith("ERROR:"):
+            self.log(f"Error: {line[6:]}")
+        # Log all data for debugging
+        elif self.is_collecting:
+            self.log(f"Data: {line}")
+    
+    def process_motor_status(self, line):
+        """Process motor status updates"""
+        if "MOTOR_STARTED" in line:
+            self.motor_running = True
+            self.motor_status.set("Motor: Running")
+            self.log("Motor started")
+        elif "MOTOR_STOPPED" in line:
+            self.motor_running = False
+            self.motor_status.set("Motor: Stopped")
+            self.log("Motor stopped")
+        elif "MOTOR_DIRECTION_SET" in line:
+            self.log(f"Motor direction set: {line.split(':')[1]}")
+    
+    def process_sensor_status(self, line):
+        """Process sensor check results"""
+        if "SENSOR_CHECK_START" in line:
+            self.log("Starting sensor check...")
+        elif "SENSOR_CHECK_END" in line:
+            self.log("Sensor check complete")
         else:
-            self.log("❌ Demo failed - Connection error")
+            # Update individual sensor status
+            for sensor in self.sensor_status:
+                if sensor in line:
+                    status = "OK" if "OK" in line else "FAIL"
+                    color = "green" if status == "OK" else "red"
+                    self.sensor_status[sensor].set(f"{sensor}: {status}")
+                    self.log(f"{sensor}: {status}")
     
-    def _demo_step_sensors(self):
-        self.log("🔍 Step 2: Checking Sensors...")
-        self.check_sensors()
-        self.root.after(3000, self._demo_step_collect)
+    def process_collection_status(self, line):
+        """Process collection status updates"""
+        if "COLLECTION_START" in line:
+            self.is_collecting = True
+            self.collection_start_time = time.time()  # Record actual start time
+            self.collect_btn.config(state=tk.DISABLED)
+            self.stop_btn.config(state=tk.NORMAL)
+            self.log(f"Started collection: {line.split(':')[1]}")
+        elif "COLLECTION_END" in line:
+            self.is_collecting = False
+            self.collect_btn.config(state=tk.NORMAL)
+            self.stop_btn.config(state=tk.DISABLED)
+            self.progress['value'] = 100
+            self.log(f"Collection ended: {line.split(':')[1]}")
     
-    def _demo_step_collect(self):
-        self.log("📊 Step 3: Collecting Sample Data...")
-        self.duration_var.set("10")  # Short demo
-        self.label_var.set("normal")
-        self.start_collection()
-        self.root.after(12000, self._demo_step_complete)
-    
-    def _demo_step_complete(self):
-        self.log("🎉 Step 4: Demo Complete!")
-        self.log("=" * 70)
-        self.log("✅ Full system workflow demonstrated successfully!")
-        self.log("📁 Check your collected_data/edge_impulse/ folder for sample data")
-        self.log("🚀 Ready for real data collection and ML training!")
-        self.log("=" * 70)
-    
-    def open_data_folder(self):
-        # Get absolute path to collected_data folder
-        current_dir = os.path.dirname(os.path.abspath(__file__))
-        data_path = os.path.join(current_dir, '..', 'collected_data')
-        data_path = os.path.abspath(data_path)
-        
+    def clean_sensor_value(self, value_str):
+        """Clean only severely malformed sensor values, preserve accurate data"""
         try:
-            if platform.system() == "Windows":
-                subprocess.run(f'explorer "{data_path}"', shell=True)
-            elif platform.system() == "Darwin":  # macOS
-                subprocess.run(["open", data_path])
-            else:  # Linux
-                subprocess.run(["xdg-open", data_path])
-            self.log(f"📁 Opened data folder: {data_path}")
-        except Exception as e:
-            self.log(f"Could not open folder: {e}")
-            messagebox.showinfo("Data Folder", f"Data location: {data_path}")
+            # Only fix obvious formatting errors, don't touch valid numbers
+            if value_str.count('.') > 1:
+                # Only fix if there are multiple decimal points (severe corruption)
+                parts = value_str.split('.')
+                # Keep first part and first decimal part, ignore the rest
+                return parts[0] + '.' + parts[1]
+            elif not value_str or value_str == '.':
+                return "0.00"
+            else:
+                # Return original value if it looks reasonable
+                return value_str
+        except (ValueError, IndexError):
+            return "0.00"  # Fallback for completely malformed values
+    
+    def clean_data_line(self, line):
+        """Clean and validate incoming data line"""
+        # Remove leading/trailing whitespace and quotes
+        cleaned = line.strip().strip("'\"")
+        
+        # Skip empty lines
+        if not cleaned:
+            return None
+        
+        # Skip lines that don't start with known data prefixes
+        valid_prefixes = ["MPU_DATA:", "ENCODER_DATA:", "POWER_DATA:", "TEMP_DATA:", "ALL_DATA:"]
+        if not any(cleaned.startswith(prefix) for prefix in valid_prefixes):
+            return None
+        
+        return cleaned
+    
+    def is_valid_timestamp(self, timestamp_str):
+        """Check if timestamp string is a valid number"""
+        try:
+            int(timestamp_str)
+            return True
+        except ValueError:
+            return False
+    
+    def process_sensor_data(self, line):
+        """Process sensor data and update count"""
+        if self.is_collecting:
+            # Clean the data line first
+            cleaned_line = self.clean_data_line(line)
+            if cleaned_line is None:
+                # Log corrupted data for debugging (only first few instances)
+                if not hasattr(self, 'corrupted_count'):
+                    self.corrupted_count = 0
+                if self.corrupted_count < 5:
+                    self.log(f"Filtered corrupted data: {line.strip()}")
+                    self.corrupted_count += 1
+                return  # Skip invalid/corrupted lines
+            
+            # Store the cleaned data line
+            self.collected_data.append(cleaned_line)
+            self.data_points += 1
+            self.data_count.set(f"Data points: {self.data_points}")
+            
+            # Log every 100th data point to avoid spam
+            if self.data_points % 100 == 0:
+                self.log(f"Collected {self.data_points} data points")
+    
+    def create_motor_control_section(self, parent):
+        """Motor control section"""
+        frame = ttk.LabelFrame(parent, text="Motor Control", padding="10")
+        frame.grid(row=1, column=0, sticky=(tk.W, tk.E, tk.N, tk.S), padx=(0, 5))
+        
+        # Control buttons
+        self.start_motor_btn = ttk.Button(frame, text="Start Motor", command=self.start_motor, state=tk.DISABLED)
+        self.start_motor_btn.grid(row=0, column=0, padx=5, pady=5)
+        
+        self.stop_motor_btn = ttk.Button(frame, text="Stop Motor", command=self.stop_motor, state=tk.DISABLED)
+        self.stop_motor_btn.grid(row=0, column=1, padx=5, pady=5)
+        
+        # Direction control
+        ttk.Label(frame, text="Direction:").grid(row=1, column=0, sticky=tk.W, padx=5, pady=5)
+        self.direction_var = tk.StringVar(value="0")
+        direction_frame = ttk.Frame(frame)
+        direction_frame.grid(row=1, column=1, columnspan=2, sticky=tk.W, padx=5, pady=5)
+        
+        ttk.Radiobutton(direction_frame, text="Forward", variable=self.direction_var, value="1", 
+                       command=self.set_direction).pack(side=tk.LEFT, padx=5)
+        ttk.Radiobutton(direction_frame, text="Reverse", variable=self.direction_var, value="0",
+                       command=self.set_direction).pack(side=tk.LEFT, padx=5)
+        
+        # Motor status
+        self.motor_status = tk.StringVar(value="Motor: Stopped")
+        ttk.Label(frame, textvariable=self.motor_status, foreground="blue").grid(row=2, column=0, columnspan=3, pady=10)
     
     def start_motor(self):
-        if not self.serial_connection:
-            messagebox.showwarning("Warning", "Please connect to ESP32 first")
-            return
-        
-        try:
+        """Start motor"""
+        if self.serial_connection:
             self.serial_connection.write(b"MOTOR_START\n")
-            time.sleep(0.5)
-            if self.serial_connection.in_waiting:
-                response = self.serial_connection.readline().decode().strip()
-                if "MOTOR_START_ACK" in response:
-                    self.motor_status.set("Motor: RUNNING")
-                    self.log("Motor Started")
-                else:
-                    self.log(f"Motor start failed: {response}")
-                    messagebox.showerror("Error", f"Motor start failed: {response}")
-        except Exception as e:
-            self.log(f"Motor start error: {e}")
-            messagebox.showerror("Error", f"Failed to start motor: {e}")
     
     def stop_motor(self):
-        if not self.serial_connection:
-            messagebox.showwarning("Warning", "Please connect to ESP32 first")
-            return
-        
-        try:
+        """Stop motor"""
+        if self.serial_connection:
             self.serial_connection.write(b"MOTOR_STOP\n")
-            time.sleep(0.5)
-            if self.serial_connection.in_waiting:
-                response = self.serial_connection.readline().decode().strip()
-                if "MOTOR_STOP_ACK" in response:
-                    self.motor_status.set("Motor: STOPPED")
-                    self.log("Motor Stopped")
-                else:
-                    self.log(f"Motor stop failed: {response}")
-        except Exception as e:
-            self.log(f"Motor stop error: {e}")
-            messagebox.showerror("Error", f"Failed to stop motor: {e}")
     
-    def set_motor_direction(self, direction):
+    def set_direction(self):
+        """Set motor direction"""
+        if self.serial_connection:
+            direction = self.direction_var.get()
+            self.serial_connection.write(f"MOTOR_DIR {direction}\n".encode())
+    
+    def create_sensor_check_section(self, parent):
+        """Sensor check section"""
+        frame = ttk.LabelFrame(parent, text="Sensor Status", padding="10")
+        frame.grid(row=1, column=1, sticky=(tk.W, tk.E, tk.N, tk.S), padx=(5, 0))
+        
+        # Check button
+        ttk.Button(frame, text="Check All Sensors", command=self.check_sensors).grid(row=0, column=0, columnspan=2, pady=5)
+        
+        # Sensor status labels
+        self.sensor_status = {
+            'MPU6050': tk.StringVar(value="MPU6050: Unknown"),
+            'ENCODER': tk.StringVar(value="Encoder: Unknown"),
+            'MAX471': tk.StringVar(value="MAX471: Unknown"),
+            'DS18B20': tk.StringVar(value="DS18B20: Unknown")
+        }
+        
+        ttk.Label(frame, textvariable=self.sensor_status['MPU6050']).grid(row=1, column=0, sticky=tk.W, padx=5, pady=2)
+        ttk.Label(frame, textvariable=self.sensor_status['ENCODER']).grid(row=1, column=1, sticky=tk.W, padx=5, pady=2)
+        ttk.Label(frame, textvariable=self.sensor_status['MAX471']).grid(row=2, column=0, sticky=tk.W, padx=5, pady=2)
+        ttk.Label(frame, textvariable=self.sensor_status['DS18B20']).grid(row=2, column=1, sticky=tk.W, padx=5, pady=2)
+    
+    def check_sensors(self):
+        """Check all sensors"""
+        if self.serial_connection:
+            self.serial_connection.write(b"CHECK_SENSORS\n")
+    
+    def create_data_collection_section(self, parent):
+        """Data collection section"""
+        frame = ttk.LabelFrame(parent, text="Data Collection", padding="10")
+        frame.grid(row=2, column=0, columnspan=2, sticky=(tk.W, tk.E, tk.N, tk.S), pady=(10, 0))
+        frame.columnconfigure(1, weight=1)
+        
+        # Sensor selection
+        ttk.Label(frame, text="Select Sensor:").grid(row=0, column=0, sticky=tk.W, padx=5, pady=5)
+        self.sensor_var = tk.StringVar(value="MPU")
+        sensor_combo = ttk.Combobox(frame, textvariable=self.sensor_var, 
+                                   values=["MPU", "ENCODER", "MAX471", "DS18B20", "ALL"], width=15)
+        sensor_combo.grid(row=0, column=1, sticky=tk.W, padx=5, pady=5)
+        
+        # Duration input
+        ttk.Label(frame, text="Duration (seconds):").grid(row=0, column=2, sticky=tk.W, padx=5, pady=5)
+        self.duration_var = tk.StringVar(value="10")
+        duration_entry = ttk.Entry(frame, textvariable=self.duration_var, width=10)
+        duration_entry.grid(row=0, column=3, sticky=tk.W, padx=5, pady=5)
+        
+        # Control buttons
+        button_frame = ttk.Frame(frame)
+        button_frame.grid(row=1, column=0, columnspan=4, pady=10)
+        
+        self.collect_btn = ttk.Button(button_frame, text="Start Collection", command=self.start_collection, state=tk.DISABLED)
+        self.collect_btn.pack(side=tk.LEFT, padx=5)
+        
+        self.stop_btn = ttk.Button(button_frame, text="Stop Collection", command=self.stop_collection, state=tk.DISABLED)
+        self.stop_btn.pack(side=tk.LEFT, padx=5)
+        
+        ttk.Button(button_frame, text="Save Data", command=self.save_data).pack(side=tk.LEFT, padx=5)
+        ttk.Button(button_frame, text="Clear Data", command=self.clear_data).pack(side=tk.LEFT, padx=5)
+        
+        # Progress bar
+        ttk.Label(frame, text="Progress:").grid(row=2, column=0, sticky=tk.W, padx=5, pady=5)
+        self.progress = ttk.Progressbar(frame, mode='determinate')
+        self.progress.grid(row=2, column=1, columnspan=3, sticky=(tk.W, tk.E), padx=5, pady=5)
+        
+        # Data count
+        self.data_count = tk.StringVar(value="Data points: 0")
+        ttk.Label(frame, textvariable=self.data_count).grid(row=3, column=0, columnspan=4, pady=5)
+    
+    def start_collection(self):
+        """Start data collection"""
         if not self.serial_connection:
-            messagebox.showwarning("Warning", "Please connect to ESP32 first")
+            messagebox.showerror("Error", "Not connected to device")
             return
         
         try:
-            cmd = f"MOTOR_DIR:{direction}\n"
-            self.serial_connection.write(cmd.encode())
-            time.sleep(0.5)
-            if self.serial_connection.in_waiting:
-                response = self.serial_connection.readline().decode().strip()
-                if "MOTOR_DIR_ACK" in response:
-                    dir_text = "CW" if direction == 1 else "CCW"
-                    self.log(f"Direction set to {dir_text}")
-        except Exception as e:
-            self.log(f"Direction error: {e}")
-            messagebox.showerror("Error", f"Failed to set motor direction: {e}")
-    
-    def _on_mousewheel(self, event):
-        # Handle mouse wheel scrolling for the log text widget
-        try:
-            if event.delta:
-                # Windows
-                delta = -1 * int(event.delta / 120)
-            else:
-                # Linux
-                if event.num == 4:
-                    delta = -1  # Scroll up
-                else:
-                    delta = 1   # Scroll down
+            sensor = self.sensor_var.get()
+            duration = int(self.duration_var.get())
             
-            # Scroll the log text widget
-            self.log_text.yview_scroll(delta, "units")
-        except Exception as e:
-            # Fallback to basic scrolling if event handling fails
-            pass
+            if duration <= 0 or duration > 300:
+                messagebox.showerror("Error", "Duration must be 1-300 seconds")
+                return
+            
+            # Reset data count
+            self.data_points = 0
+            self.data_count.set("Data points: 0")
+            self.progress['value'] = 0
+            
+            # Send collection command
+            command = f"COLLECT_{sensor},{duration}\n"
+            self.serial_connection.write(command.encode())
+            
+            # Start progress update
+            self.update_progress(duration)
+            
+        except ValueError:
+            messagebox.showerror("Error", "Invalid duration")
     
-    def clear_log(self):
-        self.log_text.delete(1.0, tk.END)
-        self.log("📝 Log cleared")
+    def update_progress(self, duration):
+        """Update progress bar during collection"""
+        if self.is_collecting:
+            current = self.progress['value']
+            if current < 90:
+                self.progress['value'] = current + 1
+                self.root.after(duration * 10, lambda: self.update_progress(duration))
+    
+    def stop_collection(self):
+        """Stop data collection"""
+        self.is_collecting = False
+        if self.serial_connection:
+            # Note: ESP32 doesn't support stopping mid-collection, but we'll update UI
+            self.collect_btn.config(state=tk.NORMAL)
+            self.stop_btn.config(state=tk.DISABLED)
+            self.log("Collection stopped by user")
+    
+    def save_data(self):
+        """Save collected data to CSV"""
+        if len(self.collected_data) == 0:
+            messagebox.showinfo("Info", "No data to save")
+            return
+        
+        filename = filedialog.asksaveasfilename(
+            defaultextension=".csv",
+            filetypes=[("CSV files", "*.csv"), ("All files", "*.*")],
+            initialfile=f"sensor_data_{datetime.now().strftime('%Y%m%d_%H%M%S')}.csv"
+        )
+        
+        if filename:
+            try:
+                with open(filename, 'w', newline='') as f:
+                    writer = csv.writer(f)
+                    
+                    # Write header based on sensor type
+                    sensor = self.sensor_var.get()
+                    if sensor == "MPU":
+                        writer.writerow(['timestamp', 'accX', 'accY', 'accZ', 'gyroX', 'gyroY', 'gyroZ'])
+                        # Parse MPU data with timestamp from ESP32
+                        for line in self.collected_data:
+                            if line.startswith("MPU_DATA:"):
+                                data = line[9:]  # Remove "MPU_DATA:" prefix
+                                parts = data.split(',')
+                                # Validate data has correct number of parts (timestamp + 6 values)
+                                if len(parts) == 7 and self.is_valid_timestamp(parts[0]):
+                                    writer.writerow(parts)  # Save original data unchanged
+                                else:
+                                    # Skip invalid data lines
+                                    continue
+                    
+                    elif sensor == "ENCODER":
+                        writer.writerow(['timestamp', 'rpm', 'position'])
+                        for line in self.collected_data:
+                            if line.startswith("ENCODER_DATA:"):
+                                data = line[13:]  # Remove "ENCODER_DATA:" prefix
+                                parts = data.split(',')
+                                # Validate data has correct number of parts and valid timestamp
+                                if len(parts) == 3 and self.is_valid_timestamp(parts[0]):
+                                    writer.writerow(parts)  # Save original data unchanged
+                    
+                    elif sensor == "MAX471":
+                        writer.writerow(['timestamp', 'voltage', 'current', 'power'])
+                        for line in self.collected_data:
+                            if line.startswith("POWER_DATA:"):
+                                data = line[11:]  # Remove "POWER_DATA:" prefix
+                                parts = data.split(',')
+                                # Validate data has correct number of parts and valid timestamp
+                                if len(parts) == 4 and self.is_valid_timestamp(parts[0]):
+                                    writer.writerow(parts)  # Save original data unchanged
+                    
+                    elif sensor == "DS18B20":
+                        writer.writerow(['timestamp', 'temperature'])
+                        for line in self.collected_data:
+                            if line.startswith("TEMP_DATA:"):
+                                data = line[10:]  # Remove "TEMP_DATA:" prefix
+                                parts = data.split(',')
+                                # Validate data has correct number of parts and valid timestamp
+                                if len(parts) == 2 and self.is_valid_timestamp(parts[0]):
+                                    writer.writerow(parts)  # Save original data unchanged
+                    
+                    elif sensor == "ALL":
+                        writer.writerow(['timestamp', 'accX', 'accY', 'accZ', 'gyroX', 'gyroY', 'gyroZ', 'rpm', 'voltage', 'current', 'temperature'])
+                        for line in self.collected_data:
+                            if line.startswith("ALL_DATA:"):
+                                data = line[9:]  # Remove "ALL_DATA:" prefix
+                                parts = data.split(',')
+                                # Validate data has at least timestamp and valid format
+                                if len(parts) >= 1 and self.is_valid_timestamp(parts[0]):
+                                    writer.writerow(parts)  # Save original data unchanged
+                    
+                    else:
+                        # Generic format for unknown sensors
+                        writer.writerow(['raw_data'])
+                        for line in self.collected_data:
+                            writer.writerow([line])
+                
+                # Calculate actual duration from first and last timestamps
+                if self.collected_data:
+                    # Extract timestamps from data to calculate duration
+                    first_timestamp = None
+                    last_timestamp = None
+                    
+                    for line in self.collected_data:
+                        if line.startswith("MPU_DATA:"):
+                            data = line[9:]
+                            parts = data.split(',')
+                            if len(parts) >= 1:
+                                ts = int(parts[0])
+                                if first_timestamp is None:
+                                    first_timestamp = ts
+                                last_timestamp = ts
+                                break
+                    
+                    if first_timestamp is not None and last_timestamp is not None:
+                        actual_duration_ms = last_timestamp - first_timestamp
+                        actual_duration_s = actual_duration_ms / 1000
+                    else:
+                        actual_duration_s = 0
+                    
+                    self.log(f"Data saved to {filename}")
+                    self.log(f"Saved {len(self.collected_data)} data points")
+                    self.log(f"Actual duration: {actual_duration_s:.2f} seconds")
+                    messagebox.showinfo("Success", f"Data saved to {filename}\n{len(self.collected_data)} data points\nDuration: {actual_duration_s:.2f} seconds")
+                
+            except Exception as e:
+                self.log(f"Save error: {e}")
+                messagebox.showerror("Error", f"Failed to save data: {e}")
+    
+    def clear_data(self):
+        """Clear collected data"""
+        self.collected_data.clear()
+        self.collection_start_time = None
+        self.data_points = 0
+        self.data_count.set("Data points: 0")
+        self.progress['value'] = 0
+        self.log("Data cleared")
+    
+    def create_log_section(self, parent):
+        """Log section"""
+        frame = ttk.LabelFrame(parent, text="System Log", padding="10")
+        frame.grid(row=3, column=0, columnspan=2, sticky=(tk.W, tk.E, tk.N, tk.S), pady=(10, 0))
+        frame.columnconfigure(0, weight=1)
+        frame.rowconfigure(0, weight=1)
+        
+        # Log text widget with scrollbar
+        log_frame = ttk.Frame(frame)
+        log_frame.grid(row=0, column=0, sticky=(tk.W, tk.E, tk.N, tk.S))
+        log_frame.columnconfigure(0, weight=1)
+        log_frame.rowconfigure(0, weight=1)
+        
+        self.log_text = tk.Text(log_frame, height=10, wrap=tk.WORD)
+        scrollbar = ttk.Scrollbar(log_frame, orient=tk.VERTICAL, command=self.log_text.yview)
+        self.log_text.configure(yscrollcommand=scrollbar.set)
+        
+        self.log_text.grid(row=0, column=0, sticky=(tk.W, tk.E, tk.N, tk.S))
+        scrollbar.grid(row=0, column=1, sticky=(tk.N, tk.S))
+        
+        frame.columnconfigure(0, weight=1)
+        frame.rowconfigure(0, weight=1)
 
 def main():
-    print("Starting Industrial Predictive Maintenance System - ALL IN ONE...")
-    
     root = tk.Tk()
-    app = IndustrialPredictiveMaintenance(root)
-    
-    try:
-        root.mainloop()
-    except KeyboardInterrupt:
-        print("\nSystem terminated")
+    app = IndustrialMaintenanceGUI(root)
+    root.mainloop()
 
 if __name__ == "__main__":
     main()

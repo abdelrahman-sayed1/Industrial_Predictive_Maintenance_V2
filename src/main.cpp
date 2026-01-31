@@ -1,11 +1,9 @@
 #include <Arduino.h>
 #include "app/data_collector.h"
-#include "hal/sensor_manager.h"
-#include "../lib/MPU6050/MPU6050.h"
-#include "../lib/Encoder/Encoder.h"
-#include "../lib/MAX471/MAX471.h"
-#include "../lib/DS18B20/DS18B20.h"
-#include "../lib/DRV8825/DRV8825.h"
+#include "../lib/MPU6050_Custom.h"
+#include "../lib/Encoder_Custom.h"
+#include "../lib/MAX471_Custom.h"
+#include "../lib/DS18B20_Custom.h"
 #include "../include/config.h"
 #include "soc/gpio_struct.h"
 
@@ -18,16 +16,15 @@ static volatile bool stepPinHigh = false;
 // ============================================
 // GLOBAL SENSOR INSTANCES
 // ============================================
-MPU6050 mpu;
-Encoder encoder(ENCODER_PIN_A, ENCODER_PIN_B);
-MAX471 powerSensor(MAX471_VOLTAGE_PIN, MAX471_CURRENT_PIN);
-DS18B20 tempSensor(ONEWIRE_PIN);
-DRV8825 motorDriver(DRV8825_STEP_PIN, DRV8825_DIR_PIN, DRV8825_ENABLE_PIN, DRV8825_FAULT_PIN);
+MPU6050_Custom mpu;
+Encoder_Custom encoder(ENCODER_PIN_A, ENCODER_PIN_B);
+MAX471_Custom powerSensor(MAX471_VOLTAGE_PIN, MAX471_CURRENT_PIN);
+DS18B20_Custom tempSensor(ONEWIRE_PIN);
+// DRV8825 motorDriver(DRV8825_STEP_PIN, DRV8825_DIR_PIN, DRV8825_ENABLE_PIN, DRV8825_FAULT_PIN);
 
 // ============================================
 // APPLICATION COMPONENTS
 // ============================================
-SensorManager sensorManager;
 DataCollector dataCollector;
 
 static void IRAM_ATTR onStepTimer() {
@@ -71,15 +68,6 @@ void setup() {
     Serial.println("║  Firmware Version: " FIRMWARE_VERSION "               ║");
     Serial.println("║  Device ID: " DEVICE_ID "                    ║");
     Serial.println("╚════════════════════════════════════════╝");
-
-    // Initialize all sensors
-    if (!sensorManager.initializeAll()) {
-        Serial.println("\n⚠ WARNING: Some sensors failed initialization");
-        Serial.println("Attempting to continue...");
-    }
-
-    // Print sensor status
-    sensorManager.printStatus();
 
     // Initialize data collector
     if (!dataCollector.begin()) {

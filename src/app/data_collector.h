@@ -2,9 +2,6 @@
 #define DATA_COLLECTOR_H
 
 #include <Arduino.h>
-#include "serial_streamer.h"
-#include "../../include/types.h"
-#include "../../include/config.h"
 
 class DataCollector {
 public:
@@ -14,21 +11,21 @@ public:
     void waitForCommand();
     
 private:
-    SerialStreamer* streamer;
+    // Motor control methods
+    void startMotor();
+    void stopMotor();
+    void setMotorDirection(int direction);
     
-    void collectSession(String label, int durationMinutes);
-    void collectVibrationData(float* accel_x, float* accel_y, float* accel_z);
-    SampleFeatures extractFeatures(float* accel_x, float* accel_y, float* accel_z);
-    void checkSensorStatus();
+    // Sensor check method
+    void checkAllSensors();
     
-    // Feature calculation methods
-    float calculateRMS(float* data, int length);
-    float calculatePeak(float* data, int length);
-    float calculateStdDev(float* data, int length);
-    
-    // Timing variables
-    unsigned long lastFeature;
-    unsigned long lastRawWindow;
+    // Data collection methods
+    void parseCollectionCommand(String command);
+    void collectMPUData(int duration);
+    void collectEncoderData(int duration);
+    void collectPowerData(int duration);
+    void collectTempData(int duration);
+    void collectAllSensorData(int duration);
 };
 
 #endif

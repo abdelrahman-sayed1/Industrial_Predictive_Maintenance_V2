@@ -8,7 +8,7 @@
 // ============================================
 #define FIRMWARE_VERSION "2.0.0"
 #define DEVICE_ID "WEMOS_LOLIN32_LITE_V2"
-#define SERIAL_BAUD_RATE 115200
+#define SERIAL_BAUD_RATE 921600
 
 // ============================================
 // PIN CONFIGURATION (Wemos Lolin32 Lite)
@@ -44,10 +44,10 @@
 // DATA COLLECTION CONFIGURATION
 // ============================================
 // Data collection parameters (editable from Python GUI)
-#define DATA_COLLECTION_RATE_HZ 50        // 50Hz sampling rate
+#define DATA_COLLECTION_RATE_HZ 200       // 200Hz sampling rate (increased for better data)
 #define WINDOW_DURATION_SECONDS 4          // 4-second windows
-#define SAMPLES_PER_WINDOW (DATA_COLLECTION_RATE_HZ * WINDOW_DURATION_SECONDS)  // 200 samples per window
-#define SAMPLE_INTERVAL_US (1000000 / DATA_COLLECTION_RATE_HZ)  // 20000μs for 50Hz
+#define SAMPLES_PER_WINDOW (DATA_COLLECTION_RATE_HZ * WINDOW_DURATION_SECONDS)  // 800 samples per window
+#define SAMPLE_INTERVAL_US (1000000 / DATA_COLLECTION_RATE_HZ)  // 5000μs for 200Hz
 #define DATA_CHANNELS 6                   // Acc(X,Y,Z) + Gyro(X,Y,Z)
 
 // Legacy sampling configuration (for compatibility)

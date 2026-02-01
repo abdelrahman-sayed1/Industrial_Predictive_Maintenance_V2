@@ -55,6 +55,8 @@ void DS18B20_Custom::reset() {
     bool present = (digitalRead(pin) == LOW);
     delayMicroseconds(PRESENCE_PULSE);
     
+    // Update presence status
+    present = (digitalRead(pin) == LOW);
     return;
 }
 
